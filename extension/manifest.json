@@ -1,0 +1,30 @@
+{
+    "manifest_version": 3,
+    "name": "Firebase Auth Sidepanel Extension",
+    "description": "Manifest V3 Chrome extension using Firebase Auth (REST API) with side panel.",
+    "version": "1.0.0",
+  
+    "permissions": [
+      "sidePanel",
+      "alarms",
+      "storage"
+    ],
+    "host_permissions": [
+      "https://identitytoolkit.googleapis.com/*",
+      "https://securetoken.googleapis.com/*"
+    ],
+    "action": {
+      "default_title": "Yan Paneli Aç"
+    },
+    "side_panel": {
+      "default_path": "sidepanel.html"
+    },
+    "background": {
+      "service_worker": "service-worker.js",
+      "type": "module"
+    },
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; object-src 'self';"
+    }
+  }
+  

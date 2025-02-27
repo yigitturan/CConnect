@@ -1,0 +1,23 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 10px;
+  width: 300px;
+}
+
+h2 {
+  font-size: 1.2em;
+  margin-bottom: 0.5em;
+}
+
+input, button {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+}
+
+button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
