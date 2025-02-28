@@ -46,7 +46,17 @@ button:hover {
   text-decoration: underline;
 }
 
-/* Ekranları gizleme ve gösterme */
+/* ✅ Chat mesajları için yeni stiller */
+#messages-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  padding: 10px;
+  background-color: white;
+  text-align: left;
+  margin-bottom: 10px;
+}
+
 .hidden {
   display: none;
 }
