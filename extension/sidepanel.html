@@ -3,26 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <title>Firebase Auth Panel</title>
-  <style>
-    body { font-family: sans-serif; margin: 1em; }
-    #status { color: red; margin-top: 0.5em; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
   <script defer src="sidepanel.js"></script>
 </head>
 <body>
-  <h2>Firebase Auth</h2>
-  <div id="auth-section">
-    <div id="login-form">
-      <input type="email" id="email" placeholder="E-posta" required />
-      <input type="password" id="password" placeholder="Şifre" required />
-      <button id="loginBtn">Giriş Yap</button>
-      <button id="signupBtn">Kayıt Ol</button>
-    </div>
-    <div id="user-info" style="display:none;">
-      <p id="welcomeMsg"></p>
-      <button id="logoutBtn">Çıkış Yap</button>
-    </div>
+
+  <div id="login-screen">
+    <h2>Giriş Yap</h2>
+    <input type="email" id="email" placeholder="E-posta" required />
+    <input type="password" id="password" placeholder="Şifre" required />
+    <button id="loginBtn">Giriş Yap</button>
+    <p class="switch-screen">Hesabın yok mu? <a href="#" id="showSignup">Kayıt Ol</a></p>
     <p id="status"></p>
   </div>
+
+  <div id="signup-screen" class="hidden">
+    <h2>Kayıt Ol</h2>
+    <input type="email" id="signup-email" placeholder="E-posta" required />
+    <input type="password" id="signup-password" placeholder="Şifre" required />
+    <input type="text" id="nickname" placeholder="Takma Ad (Nickname)" required />
+    <button id="signupBtn">Kayıt Ol</button>
+    <p class="switch-screen">Zaten hesabın var mı? <a href="#" id="showLogin">Giriş Yap</a></p>
+  </div>
+
+  <div id="user-info" class="hidden">
+    <p id="welcomeMsg"></p>
+    <button id="logoutBtn">Çıkış Yap</button>
+  </div>
+
 </body>
 </html>
