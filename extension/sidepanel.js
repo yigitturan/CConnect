@@ -107,6 +107,27 @@ document.addEventListener("DOMContentLoaded", () => {
       }
   });
 
+  logoutBtn.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ action: "logout" }, (response) => {
+          if (response?.success) {
+              showStatus("Çıkış yapıldı.");
+              console.log("[Logout Success] Kullanıcı başarıyla çıkış yaptı.");
+
+              // Ekranları sıfırla
+              loginScreen.classList.remove("hidden");
+              signupScreen.classList.add("hidden");
+              userInfoDiv.classList.add("hidden");
+              chatScreen.classList.add("hidden");
+
+              // Mesajları temizle
+              messagesContainer.innerHTML = "";
+          } else {
+              showStatus("Çıkış yapma hatası!", true);
+              console.error("[Logout Error] Çıkış başarısız.");
+          }
+      });
+  });
+
   async function loadMessages() {
       try {
           const response = await fetch("https://cconnectyigit-default-rtdb.firebaseio.com/messages.json");
