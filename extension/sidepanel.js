@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupScreen = document.getElementById("signup-screen");
   const userInfoDiv = document.getElementById("user-info");
   const chatScreen = document.getElementById("chat-screen");
+  const messagesContainer = document.getElementById("messages-container");
 
   const emailInput = document.getElementById("email");
   const passwordInput = document.getElementById("password");
@@ -16,12 +17,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const messageInput = document.getElementById("messageInput");
   const sendMessageBtn = document.getElementById("sendMessageBtn");
-  const messagesContainer = document.getElementById("messages-container");
 
   let currentUserNickname = "";
   const statusP = document.getElementById("status");
 
-  // ✅ Kayıt ol ve giriş ekranı geçişleri düzeltildi
   document.getElementById("showSignup").addEventListener("click", (event) => {
       event.preventDefault();
       loginScreen.classList.add("hidden");
@@ -34,34 +33,58 @@ document.addEventListener("DOMContentLoaded", () => {
       loginScreen.classList.remove("hidden");
   });
 
+  // Kullanıcı renklerini belirleme
+  const colorMap = new Map();
+  // Kullanıcı renklerini belirleme (Sadece RGB renklerinden rastgele seçer)
+
+// Kullanıcı renklerini belirleme (Mat Mor, Kırmızı, Sarı, Turuncu arasından rastgele seçer)
+// Kullanıcı renklerini belirleme (Mat Mor, Mat Kırmızı, Mat Turuncu arasından rastgele seçer)
+function getRandomColor() {
+  const colors = ["#8E44AD", "#C0392B", "#D35400"]; 
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+
+
+
+  function getUserColor(username) {
+      if (!colorMap.has(username)) {
+          colorMap.set(username, getRandomColor());
+      }
+      return colorMap.get(username);
+  }
+
+  // Kayıt olma işlemi
   signupBtn.addEventListener("click", () => {
-      const email = signupEmailInput.value;
-      const password = signupPasswordInput.value;
-      const nickname = nicknameInput.value;
+      const email = signupEmailInput.value.trim();
+      const password = signupPasswordInput.value.trim();
+      const nickname = nicknameInput.value.trim();
 
       if (!email || !password || !nickname) {
           showStatus("Tüm alanları doldurun!", true);
           return;
       }
 
-      showStatus("Kayıt işlemi yapılıyor...");
-
       chrome.runtime.sendMessage({ action: "signup", email, password, nickname }, (response) => {
           if (response?.success) {
-              showStatus("Kayıt başarılı! Giriş ekranına yönlendiriliyorsunuz.");
-              console.log("[Signup Success] Yeni kullanıcı oluşturuldu:", email);
-              signupScreen.classList.add("hidden");
               loginScreen.classList.remove("hidden");
+              signupScreen.classList.add("hidden");
           } else {
               showStatus("Kayıt hatası: " + (response.error || "Bilinmeyen hata"), true);
-              console.error("[Signup Error] Firebase kayıt başarısız:", response.error);
           }
       });
   });
 
+  // Giriş yapma işlemi
   loginBtn.addEventListener("click", () => {
-      const email = emailInput.value;
-      const password = passwordInput.value;
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (!email || !password) {
+          showStatus("Lütfen tüm alanları doldurun!", true);
+          return;
+      }
+
       chrome.runtime.sendMessage({ action: "login", email, password }, (response) => {
           if (response?.success) {
               currentUserNickname = response.nickname;
@@ -70,16 +93,37 @@ document.addEventListener("DOMContentLoaded", () => {
               userInfoDiv.classList.remove("hidden");
               chatScreen.classList.remove("hidden");
               loadMessages();
+          } else {
+              showStatus("Giriş hatası: " + (response.error || "Bilinmeyen hata"), true);
           }
       });
   });
 
-  sendMessageBtn.addEventListener("click", async () => {
-      const message = messageInput.value.trim();
-      if (message === "") {
-          showStatus("Boş mesaj gönderilemez!", true);
-          return;
+  // Çıkış yapma işlemi
+  logoutBtn.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ action: "logout" }, (response) => {
+          if (response?.success) {
+              loginScreen.classList.remove("hidden");
+              signupScreen.classList.add("hidden");
+              userInfoDiv.classList.add("hidden");
+              chatScreen.classList.add("hidden");
+              messagesContainer.innerHTML = "";
+          }
+      });
+  });
+
+  // Mesaj gönderme işlemi
+  sendMessageBtn.addEventListener("click", sendMessage);
+  messageInput.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") {
+          event.preventDefault();
+          sendMessage();
       }
+  });
+
+  async function sendMessage() {
+      const message = messageInput.value.trim();
+      if (message === "") return;
 
       const newMessage = {
           sender: currentUserNickname,
@@ -95,69 +139,46 @@ document.addEventListener("DOMContentLoaded", () => {
           });
 
           if (!response.ok) {
-              throw new Error(`Mesaj gönderme başarısız: ${response.status} ${response.statusText}`);
+              throw new Error("Mesaj gönderme başarısız");
           }
 
-          showStatus("Mesaj gönderildi!");
           messageInput.value = "";
-          loadMessages();
+          setTimeout(loadMessages, 500);
       } catch (error) {
-          showStatus("Mesaj gönderme hatası!", true);
-          console.error("[SendMessage Error]", error);
+          console.error("Mesaj gönderme hatası:", error);
       }
-  });
+  }
 
-  logoutBtn.addEventListener("click", () => {
-      chrome.runtime.sendMessage({ action: "logout" }, (response) => {
-          if (response?.success) {
-              showStatus("Çıkış yapıldı.");
-              console.log("[Logout Success] Kullanıcı başarıyla çıkış yaptı.");
-
-              // Ekranları sıfırla
-              loginScreen.classList.remove("hidden");
-              signupScreen.classList.add("hidden");
-              userInfoDiv.classList.add("hidden");
-              chatScreen.classList.add("hidden");
-
-              // Mesajları temizle
-              messagesContainer.innerHTML = "";
-          } else {
-              showStatus("Çıkış yapma hatası!", true);
-              console.error("[Logout Error] Çıkış başarısız.");
-          }
-      });
-  });
-
+  // Mesajları yükleme fonksiyonu
   async function loadMessages() {
       try {
           const response = await fetch("https://cconnectyigit-default-rtdb.firebaseio.com/messages.json");
-
-          if (!response.ok) {
-              throw new Error(`Mesajları alma başarısız: ${response.status} ${response.statusText}`);
-          }
+          if (!response.ok) throw new Error("Mesajları alma başarısız");
 
           const data = await response.json();
           messagesContainer.innerHTML = "";
 
           if (data && Object.keys(data).length > 0) {
               Object.values(data).forEach((message) => {
-                  const messageElement = document.createElement("p");
+                  const messageElement = document.createElement("div");
                   messageElement.textContent = `${message.sender}: ${message.text}`;
+                  messageElement.classList.add(message.sender === currentUserNickname ? "sent-message" : "received-message");
+                  messageElement.style.backgroundColor = getUserColor(message.sender);
+
                   messagesContainer.appendChild(messageElement);
               });
-          } else {
-              messagesContainer.innerHTML = "<p>Henüz mesaj yok. İlk mesajı sen gönder!</p>";
+
+              scrollToBottom();
           }
       } catch (error) {
-          showStatus("Mesajları yükleme hatası!", true);
-          console.error("[LoadMessages Error]", error);
+          console.error("Mesajları yükleme hatası:", error);
       }
   }
 
-  setInterval(loadMessages, 3000);
-
-  function showStatus(msg, isError = false) {
-      statusP.style.color = isError ? "red" : "green";
-      statusP.textContent = msg;
+  function scrollToBottom() {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
+
+  setInterval(loadMessages, 3000);
+  loadMessages();
 });

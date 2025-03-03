@@ -2,12 +2,13 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Firebase Auth Panel</title>
+  <title>Firebase Chat Panel</title>
   <link rel="stylesheet" href="styles.css">
   <script defer src="sidepanel.js"></script>
 </head>
 <body>
 
+  <!-- Giriş Ekranı -->
   <div id="login-screen">
     <h2>Giriş Yap</h2>
     <input type="email" id="email" placeholder="E-posta" required />
@@ -17,6 +18,7 @@
     <p id="status"></p>
   </div>
 
+  <!-- Kayıt Ol Ekranı -->
   <div id="signup-screen" class="hidden">
     <h2>Kayıt Ol</h2>
     <input type="email" id="signup-email" placeholder="E-posta" required />
@@ -26,16 +28,25 @@
     <p class="switch-screen">Zaten hesabın var mı? <a href="#" id="showLogin">Giriş Yap</a></p>
   </div>
 
+  <!-- Kullanıcı Bilgisi -->
   <div id="user-info" class="hidden">
     <p id="welcomeMsg"></p>
     <button id="logoutBtn">Çıkış Yap</button>
   </div>
 
+  <!-- Chat Ekranı -->
   <div id="chat-screen" class="hidden">
     <h2>Chat</h2>
+    
+    <!-- Mesajları Gösteren Alan -->
     <div id="messages-container"></div>
-    <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." />
-    <button id="sendMessageBtn">Gönder</button>
+
+    <!-- Mesaj Yazma Alanı -->
+    <div id="message-box">
+      <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." />
+      <button id="sendMessageBtn">Gönder</button>
+    </div>
+
   </div>
 
 </body>
