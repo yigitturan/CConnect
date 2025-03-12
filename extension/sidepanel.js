@@ -1,9 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
     const loginScreen = document.getElementById("login-screen");
     const signupScreen = document.getElementById("signup-screen");
+    const appContainer = document.getElementById("app-container");
     const userInfoDiv = document.getElementById("user-info");
     const chatScreen = document.getElementById("chat-screen");
     const messagesContainer = document.getElementById("messages-container");
+    const videoContainer = document.getElementById("video-chat-container");
     
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
@@ -20,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Video Chat elements
     const openVideoChatBtn = document.getElementById("openVideoChatBtn");
+    const collapseVideoChatBtn = document.getElementById("collapseVideoChat");
     const roomControlsSection = document.getElementById("roomControlsSection");
     const roomIdInput = document.getElementById("roomIdInput");
     const joinRoomBtn = document.getElementById("joinRoomBtn");
@@ -62,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Kullanıcı renklerini belirleme
     const colorMap = new Map();
     function getRandomColor() {
-      const colors = ["#8E44AD", "#C0392B", "#D35400"]; 
+      const colors = ["#8E44AD", "#C0392B", "#D35400", "#27AE60", "#2980B9"]; 
       return colors[Math.floor(Math.random() * colors.length)];
     }
     
@@ -97,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response?.success) {
           loginScreen.classList.remove("hidden");
           signupScreen.classList.add("hidden");
+          showStatus("Kayıt başarılı, şimdi giriş yapabilirsiniz.");
         } else {
           showStatus("Kayıt hatası: " + (response.error || "Bilinmeyen hata"), true);
         }
@@ -118,8 +122,8 @@ document.addEventListener("DOMContentLoaded", () => {
           currentUserNickname = response.nickname;
           loginScreen.classList.add("hidden");
           signupScreen.classList.add("hidden");
-          userInfoDiv.classList.remove("hidden");
-          chatScreen.classList.remove("hidden");
+          appContainer.classList.remove("hidden");
+          document.getElementById("welcomeMsg").textContent = `Merhaba, ${currentUserNickname}`;
           loadMessages();
         } else {
           showStatus("Giriş hatası: " + (response.error || "Bilinmeyen hata"), true);
@@ -132,18 +136,28 @@ document.addEventListener("DOMContentLoaded", () => {
       chrome.runtime.sendMessage({ action: "logout" }, (response) => {
         if (response?.success) {
           loginScreen.classList.remove("hidden");
-          signupScreen.classList.add("hidden");
-          userInfoDiv.classList.add("hidden");
-          chatScreen.classList.add("hidden");
+          appContainer.classList.add("hidden");
+          videoContainer.classList.add("hidden");
           messagesContainer.innerHTML = "";
           
-          // Video chat container'ı da gizle
-          const videoContainer = document.getElementById('video-chat-container');
-          if (videoContainer) {
-            videoContainer.classList.add('hidden');
+          // Video chat'i kapat
+          if (window.currentPeerConnection) {
+            window.currentPeerConnection.close();
+            window.currentPeerConnection = null;
           }
         }
       });
+    });
+    
+    // Video görüşme toggle
+    collapseVideoChatBtn.addEventListener("click", () => {
+      if (videoContainer.classList.contains("hidden")) {
+        videoContainer.classList.remove("hidden");
+        collapseVideoChatBtn.textContent = "Gizle";
+      } else {
+        videoContainer.classList.add("hidden");
+        collapseVideoChatBtn.textContent = "Göster";
+      }
     });
     
     // Video görüşmesi başlatma işlemi
@@ -157,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
         roomIdInput.value = roomId;
         roomControlsSection.classList.remove('hidden');
         
-        // Video görüşme penceresini yan panelde aç
+        // Video görüşme penceresini aç
         openVideoChatWindow(roomId);
       } catch (error) {
         console.error('Error creating room:', error);
@@ -186,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         currentRoomId = roomId;
         
-        // Video görüşme penceresini yan panelde aç
+        // Video görüşme penceresini aç
         openVideoChatWindow(roomId);
       } catch (error) {
         console.error('Error joining room:', error);
@@ -201,53 +215,22 @@ document.addEventListener("DOMContentLoaded", () => {
       alert('Oda ID kopyalandı!');
     });
     
-    // Video görüşme penceresini yan panelde aç
+    // Video görüşme penceresini aç
     function openVideoChatWindow(roomId) {
-      // Chat ekranını gizle
-      document.getElementById('chat-screen').classList.add('hidden');
+      // Video chat alanını görünür yap
+      videoContainer.classList.remove('hidden');
       
-      // Video chat alanını oluştur (eğer daha önce oluşturulmadıysa)
-      if (!document.getElementById('video-chat-container')) {
-        const videoContainer = document.createElement('div');
-        videoContainer.id = 'video-chat-container';
-        videoContainer.innerHTML = `
-            <div class="video-header">
-                <h2>Video Görüşmesi</h2>
-                <button id="backToChat" class="back-button">Sohbete Dön</button>
-            </div>
-            <div class="videos">
-                <video id="localVideo" autoplay muted playsinline></video>
-                <video id="remoteVideo" autoplay playsinline></video>
-            </div>
-            <div class="controls">
-                <button id="startButton">Kamerayı Başlat</button>
-                <button id="hangupButton" disabled>Görüşmeyi Sonlandır</button>
-            </div>
-            <div id="roomInfo">
-                <p>Oda ID: <span id="roomIdDisplay">${roomId}</span></p>
-                <p>Durum: <span id="status">Başlamak için kamerayı başlat</span></p>
-            </div>
-        `;
-        document.body.appendChild(videoContainer);
-        
-        // Video chat başlatma ve kontrol işlevlerini ekle
-        initializeVideoChat(roomId);
-        
-        // Sohbete dön butonu
-        document.getElementById('backToChat').addEventListener('click', () => {
-          document.getElementById('video-chat-container').classList.add('hidden');
-          document.getElementById('chat-screen').classList.remove('hidden');
-        });
-      } else {
-        document.getElementById('video-chat-container').classList.remove('hidden');
-        document.getElementById('roomIdDisplay').textContent = roomId;
-        // Mevcut video görüşmesini kapat ve yenisini başlat
-        if (window.currentPeerConnection) {
-          window.currentPeerConnection.close();
-          window.currentPeerConnection = null;
-        }
-        initializeVideoChat(roomId);
+      // Oda ID'sini göster
+      document.getElementById('roomIdDisplay').textContent = roomId;
+      
+      // Eğer mevcut bir görüşme varsa kapat
+      if (window.currentPeerConnection) {
+        window.currentPeerConnection.close();
+        window.currentPeerConnection = null;
       }
+      
+      // Video chat başlat
+      initializeVideoChat(roomId);
     }
     
     // Video chat işlevlerini başlat
@@ -263,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const remoteVideo = document.getElementById('remoteVideo');
       const startButton = document.getElementById('startButton');
       const hangupButton = document.getElementById('hangupButton');
-      const statusElement = document.getElementById('status');
+      const statusElement = document.getElementById('videoStatus');
       
       // STUN/TURN sunucuları
       const servers = {
@@ -615,5 +598,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     setInterval(loadMessages, 3000);
-    loadMessages();
-  });
+});

@@ -1,16 +1,19 @@
-/* 📌 Genel Stiller */
+/* 📌 Genel Stiller - Dark Mode */
 body {
   font-family: Arial, sans-serif;
   text-align: center;
-  background-color: #f4f4f4;
+  background-color: #2a2a2a; /* Ana arka plan rengi - koyu gri */
   padding: 20px;
   width: 300px;
+  min-height: 600px;
+  color: #e0e0e0; /* Genel yazı rengi - açık gri */
 }
 
 /* ✅ Giriş ve Kayıt Ol Ekranı */
-h2 {
+h2, h3 {
   font-size: 1.5em;
   margin-bottom: 10px;
+  color: #f0f0f0; /* Başlık rengi - beyaza yakın */
 }
 
 input, button {
@@ -18,11 +21,21 @@ input, button {
   padding: 10px;
   margin: 5px 0;
   border-radius: 5px;
-  border: 1px solid #ccc;
+  border: 1px solid #444;
+}
+
+input {
+  background-color: #3a3a3a; /* Input arka plan rengi - orta koyu gri */
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+input::placeholder {
+  color: #999;
 }
 
 button {
-  background-color: #4CAF50;
+  background-color: #4e6a50; /* Yeşilin koyu tonu */
   color: white;
   font-size: 1em;
   border: none;
@@ -31,41 +44,263 @@ button {
 }
 
 button:hover {
-  background-color: #45a049;
+  background-color: #5d7d5f; /* Yeşilin daha açık tonu hover durumunda */
 }
 
 button:disabled {
-  background-color: #ccc;
+  background-color: #4a4a4a;
   cursor: not-allowed;
+  color: #888;
 }
 
 .switch-screen {
   font-size: 0.9em;
+  margin-top: 10px;
+  color: #bbb;
 }
 
 .switch-screen a {
-  color: #007bff;
+  color: #7aa2dd; /* Mavi link rengi */
   text-decoration: none;
   font-weight: bold;
 }
 
 .switch-screen a:hover {
+  color: #98c0ff;
   text-decoration: underline;
+}
+
+/* ✅ Ana Uygulama Yapısı */
+#app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ✅ Video Chat Bölümü */
+#video-chat-section {
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #383b45; /* Hafif mavi-gri tonu */
+  border-radius: 8px;
+  border: 1px solid #4b5164;
+  text-align: center;
+}
+
+.video-chat-info {
+  margin-bottom: 5px;
+}
+
+.video-chat-info h3 {
+  font-size: 16px;
+  margin: 5px 0;
+  color: #dbe4ff;
+}
+
+/* Daha kompakt buton ve kontrol stilleri */
+.video-controls {
+  display: flex;
+  justify-content: center;
+}
+
+.primary-button {
+  background-color: #3f4490; /* Koyu mor-mavi */
+  color: white;
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: auto;
+  display: inline-block;
+}
+
+.primary-button:hover {
+  background-color: #4a50a7;
+}
+
+.room-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.room-controls input {
+  flex-grow: 1;
+  padding: 5px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 100px;
+  margin: 0;
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.room-controls button {
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 0;
+  width: auto;
+}
+
+#joinRoomBtn {
+  background-color: #5522b1; /* Koyu mor */
+}
+
+#joinRoomBtn:hover {
+  background-color: #6632c8;
+}
+
+#copyRoomIdBtn {
+  background-color: #146375; /* Koyu turkuaz */
+}
+
+#copyRoomIdBtn:hover {
+  background-color: #1a7d92;
+}
+
+/* ✅ Video Görüşme Container */
+#video-chat-container {
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background-color: #333;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  padding: 10px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.video-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.video-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #ddd;
+}
+
+.back-button {
+  background-color: #555;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  width: auto;
+  font-size: 12px;
+}
+
+.back-button:hover {
+  background-color: #666;
+}
+
+/* Kamera görünümleri */
+.videos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#localVideo {
+  width: 100%;
+  border-radius: 6px;
+  background-color: #222; /* Çok koyu gri - video yüklenmeden önce görünecek */
+  height: 180px;
+  object-fit: cover;
+  border: 1px solid #444;
+}
+
+#remoteVideo {
+  width: 100%;
+  border-radius: 6px;
+  background-color: #222;
+  height: 220px;
+  object-fit: cover;
+  border: 1px solid #444;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  justify-content: center;
+}
+
+.controls button {
+  width: auto;
+  padding: 6px 12px;
+  font-size: 13px;
+  background-color: #444;
+}
+
+.controls button:hover {
+  background-color: #555;
+}
+
+#hangupButton {
+  background-color: #8e3941; /* Koyu kırmızı */
+}
+
+#hangupButton:hover {
+  background-color: #aa454e;
+}
+
+#roomInfo {
+  background-color: #2d2d2d;
+  padding: 8px;
+  border-radius: 5px;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #bbb;
+  border: 1px solid #444;
+}
+
+#roomInfo p {
+  margin: 4px 0;
+}
+
+#videoStatus {
+  font-weight: bold;
+  color: #ddd;
 }
 
 /* ✅ Chat Alanı */
 #chat-screen {
-  height: 600px;
+  height: auto;
+  max-height: 400px;
   overflow-y: auto;
   padding: 10px;
+  display: flex;
+  flex-direction: column;
+  background-color: #333;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+#chat-screen h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #ddd;
 }
 
 /* ✅ Mesajları Gösteren Alan */
 #messages-container {
-  max-height: 500px;
+  max-height: 250px;
   overflow-y: auto;
-  border: 1px solid #ccc;
-  background-color: white;
+  border: 1px solid #444;
+  background-color: #2d2d2d;
   text-align: left;
   margin-bottom: 10px;
   display: flex;
@@ -77,7 +312,7 @@ button:disabled {
 
 /* ✅ Gönderilen Mesaj (Senin Mesajın) */
 .sent-message {
-  background-color: #4CAF50 !important; /* Yeşil */
+  background-color: #41644A !important; /* Koyu yeşil */
   color: white;
   align-self: flex-end;
   text-align: right;
@@ -87,10 +322,12 @@ button:disabled {
   font-size: 14px;
   word-wrap: break-word;
   display: inline-block;
+  margin-bottom: 5px;
 }
 
 /* ✅ Alınan Mesaj (Başka Kullanıcıdan Gelen) */
 .received-message {
+  background-color: #444;
   align-self: flex-start;
   text-align: left;
   max-width: 70%;
@@ -99,16 +336,8 @@ button:disabled {
   font-size: 14px;
   word-wrap: break-word;
   display: inline-block;
-}
-
-/* 📌 Kullanıcının Mesaj Rengi (Her kullanıcıya özel renk verir) */
-.user-message {
-  padding: 8px 12px;
-  border-radius: 15px;
-  max-width: 70%;
-  word-wrap: break-word;
-  display: inline-block;
-  font-size: 14px;
+  margin-bottom: 5px;
+  color: #eee;
 }
 
 /* ✅ Mesaj Yazma Alanı */
@@ -121,14 +350,16 @@ button:disabled {
 #messageInput {
   flex-grow: 1;
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid #444;
   border-radius: 5px;
   width: calc(100% - 20px);
+  background-color: #3a3a3a;
+  color: #eee;
 }
 
 /* 📌 Gönder Butonu */
 #sendMessageBtn {
-  background-color: #007bff;
+  background-color: #215283; /* Koyu mavi */
   color: white;
   border: none;
   padding: 10px 15px;
@@ -138,156 +369,57 @@ button:disabled {
 }
 
 #sendMessageBtn:hover {
-  background-color: #0056b3;
+  background-color: #2a6bab;
 }
 
 /* 📌 Gizli (hidden) Sınıfı */
 .hidden {
-  display: none;
+  display: none !important;
 }
 
-/* ✅ Video Chat Bölümü (Popup yaklaşımı için) */
-#video-chat-section {
-  margin-bottom: 20px;
-  padding: 15px;
-  background-color: #f0f7ff;
-  border-radius: 10px;
-  border: 1px solid #bbd6ff;
-  text-align: center;
-}
-
-.video-chat-info {
+#user-info {
   margin-bottom: 10px;
-}
-
-.primary-button {
-  background-color: #4e54c8;
-  color: white;
-  padding: 12px 20px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  margin: 10px 0;
-  transition: all 0.3s ease;
-  width: auto;
-  display: inline-block;
-}
-
-.primary-button:hover {
-  background-color: #3c40c6;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.room-controls {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 10px;
-}
-
-.room-controls input {
-  flex-grow: 1;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  min-width: 120px;
-}
-
-.room-controls button {
-  padding: 8px 12px;
-  border-radius: 5px;
-  font-size: 13px;
-  margin: 0;
-  width: auto;
-}
-
-#joinRoomBtn {
-  background-color: #6610f2;
-}
-
-#joinRoomBtn:hover {
-  background-color: #520dc2;
-}
-
-#copyRoomIdBtn {
-  background-color: #17a2b8;
-}
-
-#copyRoomIdBtn:hover {
-  background-color: #138496;
-}
-
-/* Video Görüşme Container Stil */
-#video-chat-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: white;
-  z-index: 1000;
-  padding: 10px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.video-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.back-button {
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  width: auto;
-}
-
-.videos {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-#localVideo, #remoteVideo {
-  width: 100%;
-  border-radius: 8px;
   background-color: #333;
-  height: 200px;
-  object-fit: cover;
-}
-
-.controls {
-  display: flex;
-  gap: 10px;
-  margin: 10px 0;
-  justify-content: center;
-}
-
-.controls button {
-  width: auto;
-  padding: 8px 16px;
-}
-
-#roomInfo {
-  background-color: #f8f9fa;
   padding: 10px;
   border-radius: 5px;
-  margin-top: 10px;
-  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
-#status {
+#welcomeMsg {
+  margin: 0;
   font-weight: bold;
-  color: #333;
+  color: #ddd;
+}
+
+#logoutBtn {
+  background-color: #8e3941; /* Koyu kırmızı */
+  padding: 5px 10px;
+  font-size: 12px;
+  margin: 0;
+}
+
+#logoutBtn:hover {
+  background-color: #aa454e;
+}
+
+/* Scrollbar stili */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #333;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
 }

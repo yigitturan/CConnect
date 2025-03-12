@@ -30,21 +30,18 @@
     <p class="switch-screen">Zaten hesabın var mı? <a href="#" id="showLogin">Giriş Yap</a></p>
   </div>
 
-  <!-- Kullanıcı Bilgisi -->
-  <div id="user-info" class="hidden">
-    <p id="welcomeMsg"></p>
-    <button id="logoutBtn">Çıkış Yap</button>
-  </div>
-
-  <!-- Chat Ekranı -->
-  <div id="chat-screen" class="hidden">
-    <h2>Chat</h2>
+  <!-- Ana Uygulama Ekranı -->
+  <div id="app-container" class="hidden">
+    <!-- Kullanıcı Bilgisi -->
+    <div id="user-info">
+      <p id="welcomeMsg"></p>
+      <button id="logoutBtn">Çıkış Yap</button>
+    </div>
     
-    <!-- Video Chat Bölümü -->
+    <!-- Video Görüşme Bölümü -->
     <div id="video-chat-section">
       <div class="video-chat-info">
         <h3>Video Görüşmesi</h3>
-        <p>Video görüşmesi başlatmak veya katılmak için aşağıdaki butonu kullanın.</p>
       </div>
       
       <div class="video-controls">
@@ -53,20 +50,43 @@
       
       <div class="room-controls hidden" id="roomControlsSection">
         <input id="roomIdInput" placeholder="Oda ID" />
-        <button id="joinRoomBtn">Odaya Katıl</button>
-        <button id="copyRoomIdBtn">Oda ID'yi Kopyala</button>
+        <button id="joinRoomBtn">Katıl</button>
+        <button id="copyRoomIdBtn">Kopyala</button>
+      </div>
+    </div>
+
+    <!-- Video Chat Container (Başlangıçta Gizli) -->
+    <div id="video-chat-container" class="hidden">
+      <div class="video-header">
+        <h3>Video Görüşmesi</h3>
+        <button id="collapseVideoChat" class="back-button">Gizle</button>
+      </div>
+      <div class="videos">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+      <div class="controls">
+        <button id="startButton">Kamerayı Başlat</button>
+        <button id="hangupButton" disabled>Sonlandır</button>
+      </div>
+      <div id="roomInfo">
+        <p>Oda ID: <span id="roomIdDisplay">---</span></p>
+        <p>Durum: <span id="videoStatus">Başlamak için kamerayı başlat</span></p>
       </div>
     </div>
     
-    <!-- Mesajları Gösteren Alan -->
-    <div id="messages-container"></div>
+    <!-- Chat Ekranı -->
+    <div id="chat-screen">
+      <h3>Mesajlar</h3>
+      <!-- Mesajları Gösteren Alan -->
+      <div id="messages-container"></div>
 
-    <!-- Mesaj Yazma Alanı -->
-    <div id="message-box">
-      <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." />
-      <button id="sendMessageBtn">Gönder</button>
+      <!-- Mesaj Yazma Alanı -->
+      <div id="message-box">
+        <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." />
+        <button id="sendMessageBtn">Gönder</button>
+      </div>
     </div>
-
   </div>
 
 </body>
