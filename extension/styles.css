@@ -86,7 +86,6 @@ button:hover {
 
 /* ✅ Alınan Mesaj (Başka Kullanıcıdan Gelen) */
 .received-message {
-  
   align-self: flex-start;
   text-align: left;
   max-width: 70%;
@@ -140,4 +139,142 @@ button:hover {
 /* 📌 Gizli (hidden) Sınıfı */
 .hidden {
   display: none;
+}
+
+/* ✅ Video Chat Bölümü (Popup yaklaşımı için) */
+#video-chat-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f0f7ff;
+  border-radius: 10px;
+  border: 1px solid #bbd6ff;
+  text-align: center;
+}
+
+.video-chat-btn {
+  background-color: #4e54c8;
+  color: white;
+  padding: 12px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  margin: 10px 0;
+  transition: all 0.3s ease;
+  width: auto;
+  display: inline-block;
+}
+
+.video-chat-btn:hover {
+  background-color: #3c40c6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.room-info {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #e9f5ff;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.room-info p {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.room-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+
+.room-controls input {
+  flex-grow: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  min-width: 120px;
+}
+
+.room-controls button {
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-size: 13px;
+  margin: 0;
+  width: auto;
+}
+
+#copyButton {
+  background-color: #17a2b8;
+}
+
+#copyButton:hover {
+  background-color: #138496;
+}
+
+#joinRoomButton {
+  background-color: #6610f2;
+}
+
+#joinRoomButton:hover {
+  background-color: #520dc2;
+}
+
+/* Video Görüşme Container Stil */
+#video-chat-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  z-index: 1000;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.video-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.back-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.videos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#localVideo, #remoteVideo {
+  width: 100%;
+  border-radius: 8px;
+  background-color: #333;
+  height: 200px;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+#roomInfo {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
 }

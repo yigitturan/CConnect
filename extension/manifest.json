@@ -7,7 +7,10 @@
   "permissions": [
     "sidePanel",
     "alarms",
-    "storage"
+    "storage",
+    "tabCapture",
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "https://identitytoolkit.googleapis.com/*",

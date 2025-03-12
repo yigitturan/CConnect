@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <title>Firebase Chat Panel</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="firebase/firebase-app-compat.js"></script>
+  <script src="firebase/firebase-database-compat.js"></script>
   <script defer src="sidepanel.js"></script>
 </head>
 <body>
@@ -37,6 +39,24 @@
   <!-- Chat Ekranı -->
   <div id="chat-screen" class="hidden">
     <h2>Chat</h2>
+    
+    <!-- Video Chat Bölümü -->
+    <div id="video-chat-section">
+      <div class="video-chat-info">
+        <h3>Video Görüşmesi</h3>
+        <p>Video görüşmesi başlatmak veya katılmak için aşağıdaki butonu kullanın.</p>
+      </div>
+      
+      <div class="video-controls">
+        <button id="openVideoChatBtn" class="primary-button">Video Görüşmesi Başlat</button>
+      </div>
+      
+      <div class="room-controls hidden" id="roomControlsSection">
+        <input id="roomIdInput" placeholder="Oda ID" />
+        <button id="joinRoomBtn">Odaya Katıl</button>
+        <button id="copyRoomIdBtn">Oda ID'yi Kopyala</button>
+      </div>
+    </div>
     
     <!-- Mesajları Gösteren Alan -->
     <div id="messages-container"></div>

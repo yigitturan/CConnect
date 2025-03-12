@@ -25,6 +25,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "logout":
             handleLogout(sendResponse);
             return true;
+        case "openVideoChat":
+            handleVideoChat(message, sendResponse);
+            return true;
         default:
             console.warn("[SW] Bilinmeyen action türü:", message.action);
             sendResponse({ success: false, error: "UNKNOWN_ACTION" });
@@ -79,4 +82,15 @@ async function handleAuthRequest(message, sendResponse) {
 function handleLogout(sendResponse) {
     console.log("[Auth] Çıkış yapılıyor...");
     sendResponse({ success: true });
+}
+
+async function handleVideoChat(message, sendResponse) {
+    try {
+        console.log("[VideoChat] Video görüşmesi başlatılıyor:", message.roomId);
+        // Yan panelde video chat bileşenini yükle
+        sendResponse({ success: true, roomId: message.roomId });
+    } catch (err) {
+        console.error("[VideoChat] Hata:", err);
+        sendResponse({ success: false, error: err.message });
+    }
 }
