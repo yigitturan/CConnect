@@ -258,9 +258,9 @@ document.addEventListener("DOMContentLoaded", () => {
             ],
           },
           {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:numb.viagenie.ca',
+            credential: 'muazkh',
+            username: 'webrtc@live.com'
           }
         ],
         iceCandidatePoolSize: 10,
@@ -335,7 +335,6 @@ document.addEventListener("DOMContentLoaded", () => {
               type: offer.type,
               sdp: offer.sdp
             },
-            hostNickname: currentUserNickname,
             created: firebase.database.ServerValue.TIMESTAMP
           };
           
@@ -390,8 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
             answer: {
               type: answer.type,
               sdp: answer.sdp
-            },
-            participantNickname: currentUserNickname
+            }
           };
           
           await roomRef.update(roomWithAnswer);
