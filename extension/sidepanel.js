@@ -152,12 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Rastgele bir oda ID'si oluştur
         const roomId = Math.floor(Math.random() * 1000000000).toString();
         
-        // Firebase'de oda oluştur
-        await database.ref('webrtc-rooms/' + roomId).set({
-          created: firebase.database.ServerValue.TIMESTAMP,
-          createdBy: currentUserNickname
-        });
-        
+        // Oda ID'sini kaydet ve görüntüle
         currentRoomId = roomId;
         roomIdInput.value = roomId;
         roomControlsSection.classList.remove('hidden');
@@ -181,7 +176,8 @@ document.addEventListener("DOMContentLoaded", () => {
       
       try {
         // Oda var mı kontrol et
-        const roomSnapshot = await database.ref('webrtc-rooms/' + roomId).once('value');
+        const roomRef = database.ref('rooms/' + roomId);
+        const roomSnapshot = await roomRef.once('value');
         
         if (!roomSnapshot.exists()) {
           alert('Oda bulunamadı. Lütfen Oda ID\'yi kontrol edin.');
@@ -234,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
         document.body.appendChild(videoContainer);
         
-        // Video chat başlatma ve kontrol işlevlerini ekleyin
+        // Video chat başlatma ve kontrol işlevlerini ekle
         initializeVideoChat(roomId);
         
         // Sohbete dön butonu
@@ -245,23 +241,29 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         document.getElementById('video-chat-container').classList.remove('hidden');
         document.getElementById('roomIdDisplay').textContent = roomId;
+        // Mevcut video görüşmesini kapat ve yenisini başlat
+        if (window.currentPeerConnection) {
+          window.currentPeerConnection.close();
+          window.currentPeerConnection = null;
+        }
+        initializeVideoChat(roomId);
       }
     }
     
     // Video chat işlevlerini başlat
-    async function initializeVideoChat(roomId) {
+    function initializeVideoChat(roomId) {
+      // Global değişkenler
+      let localStream;
+      let remoteStream;
+      let peerConnection;
+      let roomRef;
+      
       // HTML elementleri
       const localVideo = document.getElementById('localVideo');
       const remoteVideo = document.getElementById('remoteVideo');
       const startButton = document.getElementById('startButton');
       const hangupButton = document.getElementById('hangupButton');
       const statusElement = document.getElementById('status');
-      
-      // Değişkenler
-      let localStream;
-      let remoteStream;
-      let peerConnection;
-      let roomRef;
       
       // STUN/TURN sunucuları
       const servers = {
@@ -300,8 +302,19 @@ document.addEventListener("DOMContentLoaded", () => {
           updateStatus('Kamera başlatıldı. Görüşmeye bağlanılıyor...');
           
           if (roomId) {
-            roomRef = database.ref('webrtc-rooms/' + roomId);
-            await joinOrCreateCall();
+            // Oda referansını oluştur
+            roomRef = database.ref('rooms/' + roomId);
+            
+            // Odanın durumunu kontrol et
+            const roomSnapshot = await roomRef.once('value');
+            
+            if (!roomSnapshot.exists() || !roomSnapshot.val().offer) {
+              // Oda yoksa veya oda var ama offer yoksa, oda oluştur
+              await createRoom();
+            } else {
+              // Oda varsa ve offer varsa, odaya katıl
+              await joinRoom();
+            }
           } else {
             updateStatus('Oda ID bulunamadı, görüşme başlatılamıyor.');
           }
@@ -312,43 +325,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       
-      // Çağrı oluşturma veya katılma
-      async function joinOrCreateCall() {
+      // Oda oluşturma işlevi
+      async function createRoom() {
         try {
-          const roomSnapshot = await roomRef.once('value');
+          updateStatus('Oda oluşturuluyor...');
           
-          if (!roomSnapshot.exists()) {
-            await setupAsHost();
-          } else {
-            if (roomSnapshot.val().offer) {
-              await setupAsParticipant(roomSnapshot.val());
-            } else {
-              await setupAsHost();
-            }
-          }
-        } catch (error) {
-          console.error('Error joining/creating call:', error);
-          updateStatus('Görüşme başlatma hatası: ' + error.message);
-        }
-      }
-      
-      // Sunucu olarak kurulum (teklif oluşturma)
-      async function setupAsHost() {
-        try {
-          updateStatus('Görüşme başlatılıyor...');
-          
-          // Peer connection oluştur
+          // Peer bağlantısı oluştur
           peerConnection = createPeerConnection();
+          window.currentPeerConnection = peerConnection;
           
-          // Yerel medya akışlarını peer connection'a ekle
+          // Yerel akışı peer bağlantısına ekle
           localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
           });
           
-          // ICE adaylarını topla
+          // ICE adaylarını topla ve Firebase'de sakla
           collectIceCandidates(roomRef, 'caller', 'callee');
           
-          // Bir teklif oluştur
+          // Teklif oluştur
           const offer = await peerConnection.createOffer();
           await peerConnection.setLocalDescription(offer);
           
@@ -362,40 +356,53 @@ document.addEventListener("DOMContentLoaded", () => {
             created: firebase.database.ServerValue.TIMESTAMP
           };
           
-          await roomRef.update(roomWithOffer);
+          // Oda silmeyi ayarla
+          roomRef.onDisconnect().remove();
           
-          updateStatus('Görüşme başlatıldı. Katılımcı bekleniyor...');
+          await roomRef.set(roomWithOffer);
+          
+          updateStatus('Oda oluşturuldu! Oda ID: ' + roomId + ' - Katılımcı bekleniyor...');
         } catch (error) {
-          console.error('Error setting up as host:', error);
-          updateStatus('Görüşme başlatma hatası: ' + error.message);
+          console.error('Error creating room:', error);
+          updateStatus('Oda oluşturma hatası: ' + error.message);
         }
       }
       
-      // Katılımcı olarak kurulum (yanıt oluşturma)
-      async function setupAsParticipant(roomData) {
+      // Odaya katılma işlevi
+      async function joinRoom() {
         try {
-          updateStatus('Görüşmeye katılınıyor...');
+          updateStatus('Odaya katılınıyor: ' + roomId);
           
-          // Peer connection oluştur
+          // Odayı Firebase'den al
+          const roomSnapshot = await roomRef.once('value');
+          const roomData = roomSnapshot.val();
+          
+          if (!roomData.offer) {
+            updateStatus('Oda bulundu fakat teklif bulunamadı. Lütfen farklı bir oda deneyin.');
+            return;
+          }
+          
+          // Peer bağlantısı oluştur
           peerConnection = createPeerConnection();
+          window.currentPeerConnection = peerConnection;
           
-          // Yerel medya akışlarını peer connection'a ekle
+          // Yerel akışı peer bağlantısına ekle
           localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
           });
           
-          // ICE adaylarını topla
+          // ICE adaylarını topla ve Firebase'de sakla
           collectIceCandidates(roomRef, 'callee', 'caller');
           
-          // roomData'dan teklifi işle
+          // Oda teklifini al ve uzak açıklamayı ayarla
           const offer = roomData.offer;
           await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
           
-          // Bir yanıt oluştur
+          // Yanıt oluştur
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
           
-          // Yanıtı Firebase'e kaydet
+          // Firebase'e yanıt kaydet
           const roomWithAnswer = {
             answer: {
               type: answer.type,
@@ -406,26 +413,27 @@ document.addEventListener("DOMContentLoaded", () => {
           
           await roomRef.update(roomWithAnswer);
           
-          updateStatus('Görüşmeye katılındı. Bağlantı kuruluyor...');
+          updateStatus('Odaya katılındı! Bağlantı kuruluyor...');
         } catch (error) {
-          console.error('Error setting up as participant:', error);
-          updateStatus('Görüşmeye katılma hatası: ' + error.message);
+          console.error('Error joining room:', error);
+          updateStatus('Odaya katılma hatası: ' + error.message);
         }
       }
       
-      // ICE adaylarını topla
+      // ICE adaylarını topla ve Firebase'de sakla
       function collectIceCandidates(roomRef, localName, remoteName) {
-        // Yerel ICE adaylarını sakla
+        // Yerel ICE adaylarını saklayacak koleksiyonu tanımla
         const candidatesCollection = roomRef.child(localName + 'Candidates');
         
         // ICE adaylarını dinle
         peerConnection.onicecandidate = (event) => {
           if (event.candidate) {
-            candidatesCollection.push(event.candidate.toJSON());
+            const json = event.candidate.toJSON();
+            candidatesCollection.push(json);
           }
         };
         
-        // Uzak ICE adaylarını dinle
+        // Karşı tarafın ICE adaylarını dinle ve ekle
         roomRef.child(remoteName + 'Candidates').on('child_added', snapshot => {
           const candidate = new RTCIceCandidate(snapshot.val());
           peerConnection.addIceCandidate(candidate).catch(e => {
@@ -433,25 +441,27 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         });
         
-        // Oda değişikliklerini dinle (yanıt arama)
+        // Oda değişikliklerini dinle (yanıt beklerken)
         roomRef.on('value', async snapshot => {
           const data = snapshot.val();
           if (!data) return;
           
-          // Eğer biz arayan tarafsak ve bir yanıt varsa
+          // Arayan kişiysen ve bir yanıt varsa, uzak açıklamayı ayarla
           if (localName === 'caller' && data.answer) {
-            const answer = new RTCSessionDescription(data.answer);
             if (peerConnection.signalingState !== 'stable') {
-              await peerConnection.setRemoteDescription(answer).catch(e => {
+              try {
+                const answer = new RTCSessionDescription(data.answer);
+                await peerConnection.setRemoteDescription(answer);
+                updateStatus('Yanıt alındı. Bağlantı kuruluyor...');
+              } catch (e) {
                 console.error('Error setting remote description:', e);
-              });
-              updateStatus('Yanıt alındı. Bağlantı kuruluyor...');
+              }
             }
           }
         });
       }
       
-      // Peer connection oluştur
+      // Peer bağlantısı oluştur
       function createPeerConnection() {
         const pc = new RTCPeerConnection(servers);
         
@@ -461,7 +471,9 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Uzak medya izlerini işle
         pc.ontrack = (event) => {
+          console.log('Remote track received:', event.streams);
           event.streams[0].getTracks().forEach(track => {
+            console.log('Adding remote track to remote stream:', track);
             remoteStream.addTrack(track);
           });
         };
@@ -479,11 +491,21 @@ document.addEventListener("DOMContentLoaded", () => {
         // ICE bağlantı durumu değişiklikleri
         pc.oniceconnectionstatechange = () => {
           console.log('ICE connection state:', pc.iceConnectionState);
-          if (pc.iceConnectionState === 'connected') {
+          if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
             updateStatus('Bağlantı başarılı. Görüşme aktif.');
           } else if (pc.iceConnectionState === 'failed') {
             updateStatus('Bağlantı başarısız oldu. Tekrar deneyebilirsiniz.');
           }
+        };
+        
+        // Signaling durumu değişikliklerini izle
+        pc.onsignalingstatechange = () => {
+          console.log('Signaling state:', pc.signalingState);
+        };
+        
+        // Debugging için gathering state
+        pc.onicegatheringstatechange = () => {
+          console.log('ICE gathering state:', pc.iceGatheringState);
         };
         
         return pc;
@@ -500,6 +522,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (peerConnection) {
           peerConnection.close();
           peerConnection = null;
+          window.currentPeerConnection = null;
         }
         
         if (localStream) {
@@ -513,7 +536,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         if (roomRef) {
-          roomRef.off(); // Dinleyicileri kaldır
+          // Dinleyicileri kaldır
+          roomRef.off();
         }
         
         startButton.disabled = false;
