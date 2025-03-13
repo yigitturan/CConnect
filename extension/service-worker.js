@@ -159,6 +159,26 @@ async function handleGoogleAuth(sendResponse) {
 async function handleAuthRequest(message, sendResponse) {
     const { email, password, nickname } = message;
     console.log(`[Auth] ${message.action.toUpperCase()} işlemi:`, email);
+    
+    // Şifre doğrulama
+    if (message.action === "signup") {
+        // Şifre doğrulama kontrolleri
+        if (password.length < 12) {
+            sendResponse({ success: false, error: "PASSWORD_TOO_SHORT", message: "Şifre en az 12 karakter uzunluğunda olmalıdır." });
+            return;
+        }
+        
+        if (!/[A-Z]/.test(password)) {
+            sendResponse({ success: false, error: "PASSWORD_NO_UPPERCASE", message: "Şifre en az bir büyük harf içermelidir." });
+            return;
+        }
+        
+        if (!/[a-z]/.test(password)) {
+            sendResponse({ success: false, error: "PASSWORD_NO_LOWERCASE", message: "Şifre en az bir küçük harf içermelidir." });
+            return;
+        }
+    }
+    
     const url = message.action === "signup" ?
         `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}` :
         `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
@@ -173,7 +193,37 @@ async function handleAuthRequest(message, sendResponse) {
         
         if (!response.ok) {
             console.error("[Auth] İşlem başarısız:", data);
-            sendResponse({ success: false, error: data.error?.message || "UNKNOWN_ERROR" });
+            
+            // Daha iyi hata mesajları için hata türlerine göre işlem
+            let friendlyError = data.error?.message || "UNKNOWN_ERROR";
+            
+            // Giriş hataları için daha anlayışlı mesajlar
+            switch (friendlyError) {
+                case "EMAIL_EXISTS":
+                    friendlyError = "Bu e-posta adresi zaten kullanımda.";
+                    break;
+                case "INVALID_LOGIN_CREDENTIALS":
+                case "INVALID_PASSWORD":
+                    friendlyError = "Hatalı e-posta veya şifre. Lütfen tekrar deneyin.";
+                    break;
+                case "USER_DISABLED":
+                    friendlyError = "Bu kullanıcı hesabı devre dışı bırakılmış.";
+                    break;
+                case "EMAIL_NOT_FOUND":
+                case "USER_NOT_FOUND":
+                    friendlyError = "Bu e-posta adresine kayıtlı kullanıcı bulunamadı.";
+                    break;
+                case "TOO_MANY_ATTEMPTS_TRY_LATER":
+                    friendlyError = "Çok fazla başarısız giriş denemesi. Lütfen daha sonra tekrar deneyin.";
+                    break;
+                case "WEAK_PASSWORD":
+                    friendlyError = "Şifre en az 6 karakter uzunluğunda olmalıdır.";
+                    break;
+                default:
+                    friendlyError = `İşlem sırasında bir hata oluştu: ${friendlyError}`;
+            }
+            
+            sendResponse({ success: false, error: data.error?.message, friendlyError });
             return;
         }
 
@@ -197,7 +247,7 @@ async function handleAuthRequest(message, sendResponse) {
         sendResponse({ success: true, nickname: storedNickname });
     } catch (err) {
         console.error("[Auth] Ağ hatası:", err);
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err.message, friendlyError: "Ağ bağlantısında bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin." });
     }
 }
 

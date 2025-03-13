@@ -30,6 +30,23 @@ input {
   border-color: #555;
 }
 
+input:focus {
+  border-color: #7aa2dd;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(122, 162, 221, 0.3);
+}
+
+input:invalid {
+  border-color: #ff6b6b;
+}
+
+.validation-message {
+  text-align: left;
+  font-size: 12px;
+  margin-top: 5px;
+  margin-bottom: 10px;
+}
+
 input::placeholder {
   color: #999;
 }
@@ -98,6 +115,17 @@ button:disabled {
 .switch-screen a:hover {
   color: #98c0ff;
   text-decoration: underline;
+}
+
+/* Durum Mesajları */
+#status {
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  min-height: 20px;
+  transition: all 0.3s ease;
 }
 
 /* ✅ Ana Uygulama Yapısı */

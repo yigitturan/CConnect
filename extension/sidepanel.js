@@ -21,6 +21,35 @@ document.addEventListener("DOMContentLoaded", () => {
   const messageInput = document.getElementById("messageInput");
   const sendMessageBtn = document.getElementById("sendMessageBtn");
   
+  // Password validation rules
+  const passwordValidation = {
+    minLength: 12,
+    hasUpperCase: /[A-Z]/.test.bind(/[A-Z]/),
+    hasLowerCase: /[a-z]/.test.bind(/[a-z]/)
+  };
+  
+  // Function to check if password meets requirements
+  function validatePassword(password) {
+    const errors = [];
+    
+    if (password.length < passwordValidation.minLength) {
+      errors.push(`Şifre en az ${passwordValidation.minLength} karakter olmalıdır.`);
+    }
+    
+    if (!passwordValidation.hasUpperCase(password)) {
+      errors.push("Şifre en az bir büyük harf içermelidir.");
+    }
+    
+    if (!passwordValidation.hasLowerCase(password)) {
+      errors.push("Şifre en az bir küçük harf içermelidir.");
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors: errors
+    };
+  }
+  
   // Kod Oluşturma Elemanları
   const createVideoChatCodeBtn = document.getElementById("createVideoChatCodeBtn");
   const createChatCodeBtn = document.getElementById("createChatCodeBtn");
@@ -78,6 +107,37 @@ document.addEventListener("DOMContentLoaded", () => {
     event.preventDefault();
     signupScreen.classList.add("hidden");
     loginScreen.classList.remove("hidden");
+  });
+  
+  // Add input validation feedback for signup password
+  signupPasswordInput.addEventListener("input", () => {
+    const password = signupPasswordInput.value.trim();
+    const validation = validatePassword(password);
+    
+    if (!validation.isValid) {
+      signupPasswordInput.setCustomValidity(validation.errors.join("\n"));
+      
+      // Show validation messages below the input field
+      let errorElement = document.getElementById("password-requirements");
+      if (!errorElement) {
+        errorElement = document.createElement("div");
+        errorElement.id = "password-requirements";
+        errorElement.classList.add("validation-message");
+        signupPasswordInput.parentNode.insertBefore(errorElement, signupPasswordInput.nextSibling);
+      }
+      
+      errorElement.innerHTML = validation.errors.map(err => `<p>${err}</p>`).join("");
+      errorElement.style.color = "orange";
+      errorElement.style.fontSize = "12px";
+      errorElement.style.marginTop = "4px";
+    } else {
+      signupPasswordInput.setCustomValidity("");
+      const errorElement = document.getElementById("password-requirements");
+      if (errorElement) {
+        errorElement.innerHTML = "<p>✓ Şifre gereksinimleri karşılandı.</p>";
+        errorElement.style.color = "green";
+      }
+    }
   });
   
   // Kullanıcı renklerini belirleme
@@ -141,13 +201,39 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     
+    // Şifre doğrulaması yap
+    const validation = validatePassword(password);
+    if (!validation.isValid) {
+      showStatus("Şifre gereksinimleri karşılanmıyor: " + validation.errors.join(" "), true);
+      return;
+    }
+    
     chrome.runtime.sendMessage({ action: "signup", email, password, nickname }, (response) => {
       if (response?.success) {
         loginScreen.classList.remove("hidden");
         signupScreen.classList.add("hidden");
         showStatus("Kayıt başarılı, şimdi giriş yapabilirsiniz.");
       } else {
-        showStatus("Kayıt hatası: " + (response.error || "Bilinmeyen hata"), true);
+        let errorMessage = "Kayıt hatası";
+        
+        // Firebase hata mesajlarını daha anlaşılır yap
+        if (response?.error) {
+          switch (response.error) {
+            case "EMAIL_EXISTS":
+              errorMessage = "Bu e-posta adresi zaten kullanımda.";
+              break;
+            case "OPERATION_NOT_ALLOWED":
+              errorMessage = "E-posta ve şifre ile giriş aktif değil.";
+              break;
+            case "TOO_MANY_ATTEMPTS_TRY_LATER":
+              errorMessage = "Çok fazla başarısız giriş denemesi. Lütfen daha sonra tekrar deneyin.";
+              break;
+            default:
+              errorMessage = `Kayıt hatası: ${response.error}`;
+          }
+        }
+        
+        showStatus(errorMessage, true);
       }
     });
   });
@@ -170,7 +256,32 @@ document.addEventListener("DOMContentLoaded", () => {
         appContainer.classList.remove("hidden");
         document.getElementById("welcomeMsg").textContent = `Merhaba, ${currentUserNickname}`;
       } else {
-        showStatus("Giriş hatası: " + (response.error || "Bilinmeyen hata"), true);
+        let errorMessage = "Giriş hatası";
+        
+        // Firebase hata mesajlarını daha anlaşılır yap
+        if (response?.error) {
+          switch (response.error) {
+            case "INVALID_LOGIN_CREDENTIALS":
+              errorMessage = "Hatalı e-posta veya şifre. Lütfen tekrar deneyin.";
+              break;
+            case "USER_DISABLED":
+              errorMessage = "Bu kullanıcı hesabı devre dışı bırakılmış.";
+              break;
+            case "USER_NOT_FOUND":
+              errorMessage = "Bu e-posta adresine kayıtlı kullanıcı bulunamadı.";
+              break;
+            case "INVALID_PASSWORD":
+              errorMessage = "Hatalı şifre. Lütfen tekrar deneyin.";
+              break;
+            case "TOO_MANY_ATTEMPTS_TRY_LATER":
+              errorMessage = "Çok fazla başarısız giriş denemesi. Lütfen daha sonra tekrar deneyin.";
+              break;
+            default:
+              errorMessage = `Giriş hatası: ${response.error}`;
+          }
+        }
+        
+        showStatus(errorMessage, true);
       }
     });
   });
@@ -687,262 +798,262 @@ document.addEventListener("DOMContentLoaded", () => {
           await createRoom();
         } else {
           // Oda varsa ve offer varsa, odaya katıl
-          await joinRoom();
-        }
-      } else {
-        updateStatus('Oda ID bulunamadı, görüşme başlatılamıyor.');
+        await joinRoom();
       }
-    } catch (error) {
-      console.error('Error starting call:', error);
-      updateStatus('Görüşme başlatma hatası: ' + error.message);
-      startButton.disabled = false;
-    }
-  }
-  
-  // Peer bağlantısı oluşturma
-  function createPeerConnection() {
-    console.log("Peer bağlantısı oluşturuluyor");
-    
-    // Yeni bir peer bağlantısı oluştur
-    const pc = new RTCPeerConnection(servers);
-    
-    // Uzak medya akışını ayarla
-    remoteStream = new MediaStream();
-    remoteVideo.srcObject = remoteStream;
-    
-    // Track olayı yöneticisi
-    pc.ontrack = (event) => {
-      console.log("Uzak track alındı:", event.streams);
-      
-      // Tüm akışlardan tüm izleri ekle
-      event.streams.forEach(stream => {
-        stream.getTracks().forEach(track => {
-          console.log("Uzak track uzak akışa ekleniyor:", track);
-          remoteStream.addTrack(track);
-        });
-      });
-    };
-    
-    // Bağlantı durumu değişikliği yöneticisi
-    pc.onconnectionstatechange = () => {
-      console.log("Bağlantı durumu:", pc.connectionState);
-      
-      if (pc.connectionState === 'connected') {
-        updateStatus('Bağlandı! Görüşmenin keyfini çıkarın.');
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-        updateStatus('Bağlantı kesildi veya başarısız oldu.');
-      }
-    };
-    
-    // ICE bağlantı durumu değişikliği yöneticisi
-    pc.oniceconnectionstatechange = () => {
-      console.log("ICE bağlantı durumu:", pc.iceConnectionState);
-      
-      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-        updateStatus('Bağlantı başarılı. Görüşme aktif.');
-      } else if (pc.iceConnectionState === 'failed') {
-        updateStatus('Bağlantı başarısız oldu. Tekrar deneyebilirsiniz.');
-      }
-    };
-    
-    // Signaling durumu değişikliklerini izle
-    pc.onsignalingstatechange = () => {
-      console.log("Signaling durumu:", pc.signalingState);
-    };
-    
-    // ICE toplama durumu değişikliklerini izle
-    pc.onicegatheringstatechange = () => {
-      console.log("ICE toplama durumu:", pc.iceGatheringState);
-    };
-    
-    // Yerel izleri peer bağlantısına ekle
-    if (localStream) {
-      localStream.getTracks().forEach(track => {
-        console.log("Yerel track peer bağlantısına ekleniyor:", track);
-        pc.addTrack(track, localStream);
-      });
     } else {
-      console.warn("Peer bağlantısı oluştururken yerel akış mevcut değil");
+      updateStatus('Oda ID bulunamadı, görüşme başlatılamıyor.');
     }
-    
-    return pc;
+  } catch (error) {
+    console.error('Error starting call:', error);
+    updateStatus('Görüşme başlatma hatası: ' + error.message);
+    startButton.disabled = false;
   }
+}
+
+// Peer bağlantısı oluşturma
+function createPeerConnection() {
+  console.log("Peer bağlantısı oluşturuluyor");
   
-  // Oda oluşturma işlevi
-  async function createRoom() {
-    try {
-      updateStatus("Oda oluşturuluyor...");
-      
-      // Peer bağlantısı oluştur
-      peerConnection = createPeerConnection();
-      window.currentPeerConnection = peerConnection;
-      
-      // ICE adaylarını topla ve Firebase'de sakla
-      collectIceCandidates(roomRef, 'caller', 'callee');
-      
-      // Teklif oluştur
-      const offer = await peerConnection.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
+  // Yeni bir peer bağlantısı oluştur
+  const pc = new RTCPeerConnection(servers);
+  
+  // Uzak medya akışını ayarla
+  remoteStream = new MediaStream();
+  remoteVideo.srcObject = remoteStream;
+  
+  // Track olayı yöneticisi
+  pc.ontrack = (event) => {
+    console.log("Uzak track alındı:", event.streams);
+    
+    // Tüm akışlardan tüm izleri ekle
+    event.streams.forEach(stream => {
+      stream.getTracks().forEach(track => {
+        console.log("Uzak track uzak akışa ekleniyor:", track);
+        remoteStream.addTrack(track);
       });
-      
-      // Yerel açıklamayı ayarla
-      await peerConnection.setLocalDescription(offer);
-      
-      // Teklifi Firebase'e kaydet
-      const roomWithOffer = {
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp
-        },
-        created: firebase.database.ServerValue.TIMESTAMP
-      };
-      
-      // Oda silmeyi ayarla
-      roomRef.onDisconnect().remove();
-      
-      // Odayı Firebase'e kaydet
-      await roomRef.set(roomWithOffer);
-      
-      updateStatus("Oda oluşturuldu! Katılımcı bekleniyor...");
-    } catch (error) {
-      console.error("Error creating room:", error);
-      updateStatus("Oda oluşturma hatası: " + error.message);
-    }
-  }
+    });
+  };
   
-  // Odaya katılma işlevi
-  async function joinRoom() {
-    try {
-      updateStatus("Odaya katılınıyor: " + roomId);
-      
-      // Odayı Firebase'den al
-      const roomSnapshot = await roomRef.once('value');
-      const roomData = roomSnapshot.val();
-      
-      if (!roomData.offer) {
-        updateStatus("Oda bulundu fakat teklif bulunamadı. Lütfen farklı bir oda deneyin.");
-        return;
-      }
-      
-      // Peer bağlantısı oluştur
-      peerConnection = createPeerConnection();
-      window.currentPeerConnection = peerConnection;
-      
-      // ICE adaylarını topla ve Firebase'de sakla
-      collectIceCandidates(roomRef, 'callee', 'caller');
-      
-      // Oda teklifini al ve uzak açıklamayı ayarla
-      const offer = roomData.offer;
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-      
-      // Yanıt oluştur
-      const answer = await peerConnection.createAnswer();
-      
-      // Yerel açıklamayı ayarla
-      await peerConnection.setLocalDescription(answer);
-      
-      // Firebase'e yanıt kaydet
-      const roomWithAnswer = {
-        answer: {
-          type: answer.type,
-          sdp: answer.sdp
-        }
-      };
-      
-      await roomRef.update(roomWithAnswer);
-      
-      updateStatus("Odaya katılındı! Bağlantı kuruluyor...");
-    } catch (error) {
-      console.error("Error joining room:", error);
-      updateStatus("Odaya katılma hatası: " + error.message);
-    }
-  }
-  
-  // ICE adaylarını topla ve Firebase'de sakla
-  function collectIceCandidates(roomRef, localName, remoteName) {
-    // Yerel ICE adaylarını saklayacak koleksiyonu tanımla
-    const candidatesCollection = roomRef.child(localName + 'Candidates');
+  // Bağlantı durumu değişikliği yöneticisi
+  pc.onconnectionstatechange = () => {
+    console.log("Bağlantı durumu:", pc.connectionState);
     
-    // ICE adaylarını dinle
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log("Yeni ICE adayı:", event.candidate.candidate);
-        const json = event.candidate.toJSON();
-        candidatesCollection.push(json);
+    if (pc.connectionState === 'connected') {
+      updateStatus('Bağlandı! Görüşmenin keyfini çıkarın.');
+    } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      updateStatus('Bağlantı kesildi veya başarısız oldu.');
+    }
+  };
+  
+  // ICE bağlantı durumu değişikliği yöneticisi
+  pc.oniceconnectionstatechange = () => {
+    console.log("ICE bağlantı durumu:", pc.iceConnectionState);
+    
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      updateStatus('Bağlantı başarılı. Görüşme aktif.');
+    } else if (pc.iceConnectionState === 'failed') {
+      updateStatus('Bağlantı başarısız oldu. Tekrar deneyebilirsiniz.');
+    }
+  };
+  
+  // Signaling durumu değişikliklerini izle
+  pc.onsignalingstatechange = () => {
+    console.log("Signaling durumu:", pc.signalingState);
+  };
+  
+  // ICE toplama durumu değişikliklerini izle
+  pc.onicegatheringstatechange = () => {
+    console.log("ICE toplama durumu:", pc.iceGatheringState);
+  };
+  
+  // Yerel izleri peer bağlantısına ekle
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      console.log("Yerel track peer bağlantısına ekleniyor:", track);
+      pc.addTrack(track, localStream);
+    });
+  } else {
+    console.warn("Peer bağlantısı oluştururken yerel akış mevcut değil");
+  }
+  
+  return pc;
+}
+
+// Oda oluşturma işlevi
+async function createRoom() {
+  try {
+    updateStatus("Oda oluşturuluyor...");
+    
+    // Peer bağlantısı oluştur
+    peerConnection = createPeerConnection();
+    window.currentPeerConnection = peerConnection;
+    
+    // ICE adaylarını topla ve Firebase'de sakla
+    collectIceCandidates(roomRef, 'caller', 'callee');
+    
+    // Teklif oluştur
+    const offer = await peerConnection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
+    });
+    
+    // Yerel açıklamayı ayarla
+    await peerConnection.setLocalDescription(offer);
+    
+    // Teklifi Firebase'e kaydet
+    const roomWithOffer = {
+      offer: {
+        type: offer.type,
+        sdp: offer.sdp
+      },
+      created: firebase.database.ServerValue.TIMESTAMP
+    };
+    
+    // Oda silmeyi ayarla
+    roomRef.onDisconnect().remove();
+    
+    // Odayı Firebase'e kaydet
+    await roomRef.set(roomWithOffer);
+    
+    updateStatus("Oda oluşturuldu! Katılımcı bekleniyor...");
+  } catch (error) {
+    console.error("Error creating room:", error);
+    updateStatus("Oda oluşturma hatası: " + error.message);
+  }
+}
+
+// Odaya katılma işlevi
+async function joinRoom() {
+  try {
+    updateStatus("Odaya katılınıyor: " + roomId);
+    
+    // Odayı Firebase'den al
+    const roomSnapshot = await roomRef.once('value');
+    const roomData = roomSnapshot.val();
+    
+    if (!roomData.offer) {
+      updateStatus("Oda bulundu fakat teklif bulunamadı. Lütfen farklı bir oda deneyin.");
+      return;
+    }
+    
+    // Peer bağlantısı oluştur
+    peerConnection = createPeerConnection();
+    window.currentPeerConnection = peerConnection;
+    
+    // ICE adaylarını topla ve Firebase'de sakla
+    collectIceCandidates(roomRef, 'callee', 'caller');
+    
+    // Oda teklifini al ve uzak açıklamayı ayarla
+    const offer = roomData.offer;
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    
+    // Yanıt oluştur
+    const answer = await peerConnection.createAnswer();
+    
+    // Yerel açıklamayı ayarla
+    await peerConnection.setLocalDescription(answer);
+    
+    // Firebase'e yanıt kaydet
+    const roomWithAnswer = {
+      answer: {
+        type: answer.type,
+        sdp: answer.sdp
       }
     };
     
-    // Karşı tarafın ICE adaylarını dinle ve ekle
-    roomRef.child(remoteName + 'Candidates').on('child_added', async snapshot => {
+    await roomRef.update(roomWithAnswer);
+    
+    updateStatus("Odaya katılındı! Bağlantı kuruluyor...");
+  } catch (error) {
+    console.error("Error joining room:", error);
+    updateStatus("Odaya katılma hatası: " + error.message);
+  }
+}
+
+// ICE adaylarını topla ve Firebase'de sakla
+function collectIceCandidates(roomRef, localName, remoteName) {
+  // Yerel ICE adaylarını saklayacak koleksiyonu tanımla
+  const candidatesCollection = roomRef.child(localName + 'Candidates');
+  
+  // ICE adaylarını dinle
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      console.log("Yeni ICE adayı:", event.candidate.candidate);
+      const json = event.candidate.toJSON();
+      candidatesCollection.push(json);
+    }
+  };
+  
+  // Karşı tarafın ICE adaylarını dinle ve ekle
+  roomRef.child(remoteName + 'Candidates').on('child_added', async snapshot => {
+    try {
+      const candidate = new RTCIceCandidate(snapshot.val());
+      await peerConnection.addIceCandidate(candidate);
+      console.log("Uzak ICE adayı eklendi");
+    } catch (error) {
+      console.error("ICE adayı ekleme hatası:", error);
+    }
+  });
+  
+  // Oda değişikliklerini dinle (yanıt beklerken)
+  roomRef.on('value', async snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+    
+    // Arayan kişiysen ve bir yanıt varsa, uzak açıklamayı ayarla
+    if (localName === 'caller' && data.answer && peerConnection.signalingState !== 'stable') {
       try {
-        const candidate = new RTCIceCandidate(snapshot.val());
-        await peerConnection.addIceCandidate(candidate);
-        console.log("Uzak ICE adayı eklendi");
+        const answer = new RTCSessionDescription(data.answer);
+        await peerConnection.setRemoteDescription(answer);
+        console.log("Uzak açıklama başarıyla ayarlandı");
+        updateStatus("Yanıt alındı. Bağlantı kuruluyor...");
       } catch (error) {
-        console.error("ICE adayı ekleme hatası:", error);
+        console.error("Uzak açıklamayı ayarlarken hata:", error);
       }
-    });
-    
-    // Oda değişikliklerini dinle (yanıt beklerken)
-    roomRef.on('value', async snapshot => {
-      const data = snapshot.val();
-      if (!data) return;
-      
-      // Arayan kişiysen ve bir yanıt varsa, uzak açıklamayı ayarla
-      if (localName === 'caller' && data.answer && peerConnection.signalingState !== 'stable') {
-        try {
-          const answer = new RTCSessionDescription(data.answer);
-          await peerConnection.setRemoteDescription(answer);
-          console.log("Uzak açıklama başarıyla ayarlandı");
-          updateStatus("Yanıt alındı. Bağlantı kuruluyor...");
-        } catch (error) {
-          console.error("Uzak açıklamayı ayarlarken hata:", error);
-        }
-      }
-    });
+    }
+  });
+}
+
+// Görüşmeyi sonlandır
+function hangUp() {
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+    window.currentPeerConnection = null;
   }
   
-  // Görüşmeyi sonlandır
-  function hangUp() {
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
-      window.currentPeerConnection = null;
-    }
-    
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      localVideo.srcObject = null;
-    }
-    
-    if (remoteStream) {
-      remoteStream.getTracks().forEach(track => track.stop());
-      remoteVideo.srcObject = null;
-    }
-    
-    if (roomRef) {
-      // Dinleyicileri kaldır
-      roomRef.off();
-    }
-    
-    startButton.disabled = false;
-    hangupButton.disabled = true;
-    
-    // Kamera ve mikrofon butonlarını devre dışı bırak
-    cameraToggle.classList.add('disabled');
-    micToggle.classList.add('disabled');
-    
-    updateStatus("Görüşme sonlandırıldı.");
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localVideo.srcObject = null;
   }
   
-  // Durumu güncelle
-  function updateStatus(message) {
-    videoStatus.textContent = message;
-    console.log("Durum:", message);
+  if (remoteStream) {
+    remoteStream.getTracks().forEach(track => track.stop());
+    remoteVideo.srcObject = null;
   }
   
-  // Başlangıç durumunda UI güncelle
-  updateMediaUI();
+  if (roomRef) {
+    // Dinleyicileri kaldır
+    roomRef.off();
+  }
+  
+  startButton.disabled = false;
+  hangupButton.disabled = true;
+  
+  // Kamera ve mikrofon butonlarını devre dışı bırak
+  cameraToggle.classList.add('disabled');
+  micToggle.classList.add('disabled');
+  
+  updateStatus("Görüşme sonlandırıldı.");
+}
+
+// Durumu güncelle
+function updateStatus(message) {
+  videoStatus.textContent = message;
+  console.log("Durum:", message);
+}
+
+// Başlangıç durumunda UI güncelle
+updateMediaUI();
 }
 });
