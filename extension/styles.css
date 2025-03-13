@@ -4,7 +4,7 @@ body {
   text-align: center;
   background-color: #2a2a2a; /* Ana arka plan rengi - koyu gri */
   padding: 20px;
-  width: 300px;
+  width: 290px; /* Genişliği 290px'e ayarlandı */
   min-height: 600px;
   color: #e0e0e0; /* Genel yazı rengi - açık gri */
 }
@@ -75,33 +75,36 @@ button:disabled {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 290px; /* Genişliği 290px'e ayarlandı */
 }
 
 /* Kod Oluşturma Bölümü */
 #code-creation-section {
   margin-bottom: 15px;
   background-color: #333;
-  padding: 12px 10px;
+  padding: 10px 8px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  width: 290px; /* Genişliği 290px'e ayarlandı */
 }
 
 .room-buttons {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .primary-button {
   color: white;
-  padding: 10px 12px;
-  font-size: 14px;
+  padding: 8px 6px; /* Daha küçük padding */
+  font-size: 12px; /* Daha küçük font */
   border-radius: 5px;
   border: none;
   cursor: pointer;
   transition: all 0.3s ease;
   width: 50%;
   display: inline-block;
+  height: 32px; /* Sabit yükseklik */
 }
 
 .video-btn {
@@ -122,16 +125,17 @@ button:disabled {
 
 .code-display {
   background-color: #2d2d2d;
-  padding: 8px;
+  padding: 6px;
   border-radius: 5px;
-  margin-top: 8px;
+  margin-top: 6px;
   text-align: center;
-  font-size: 14px;
+  font-size: 12px; /* Daha küçük font */
   color: #bbb;
   border: 1px solid #444;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 24px; /* Sabit yükseklik */
 }
 
 .code-display p {
@@ -150,10 +154,11 @@ button:disabled {
 
 .copy-btn {
   background-color: #555;
-  font-size: 12px;
-  padding: 4px 8px;
+  font-size: 10px; /* Daha küçük font */
+  padding: 3px 6px; /* Daha küçük padding */
   margin-left: 5px;
   width: auto;
+  height: 20px; /* Sabit yükseklik */
 }
 
 .copy-btn:hover {
@@ -164,25 +169,32 @@ button:disabled {
 #code-entry-section {
   margin-bottom: 15px;
   background-color: #333;
-  padding: 12px 10px;
+  padding: 10px 8px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  width: 290px; /* Genişliği 290px'e ayarlandı */
 }
 
 .code-entry {
   display: flex;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  align-items: center;
+  height: 32px; /* Sabit yükseklik */
 }
 
 .code-entry input {
   flex-grow: 1;
   margin-right: 5px;
-  font-size: 14px;
+  font-size: 12px; /* Daha küçük font */
+  height: 20px; /* Sabit yükseklik */
+  padding: 6px 8px; /* Daha küçük padding */
 }
 
 .code-entry button {
-  width: 50%;
-  font-size: 13px;
+  width: 40%; /* Daha az genişlik */
+  font-size: 11px; /* Daha küçük font */
+  padding: 6px 4px; /* Daha küçük padding */
+  height: 32px; /* Sabit yükseklik */
 }
 
 #joinVideoRoomBtn {
@@ -210,6 +222,7 @@ button:disabled {
   padding: 10px;
   max-height: 600px;
   overflow-y: auto;
+  width: 290px; /* Genişliği 290px'e ayarlandı */
 }
 
 .video-header {
@@ -324,6 +337,7 @@ button:disabled {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   margin-bottom: 10px;
+  width: 290px; /* Genişliği 290px'e ayarlandı */
 }
 
 .chat-header {
@@ -366,6 +380,7 @@ button:disabled {
   gap: 5px;
   padding: 10px;
   border-radius: 10px;
+  width: calc(100% - 22px); /* Paddingi hesaba katarak genişlik */
 }
 
 /* ✅ Gönderilen Mesaj (Senin Mesajın) */
@@ -403,16 +418,18 @@ button:disabled {
   display: flex;
   gap: 5px;
   margin-top: 10px;
+  width: 100%;
 }
 
 #messageInput {
   flex-grow: 1;
-  padding: 10px;
+  padding: 8px 10px;
   border: 1px solid #444;
   border-radius: 5px;
   width: calc(100% - 20px);
   background-color: #3a3a3a;
   color: #eee;
+  font-size: 13px;
 }
 
 /* 📌 Gönder Butonu */
@@ -420,11 +437,12 @@ button:disabled {
   background-color: #215283; /* Koyu mavi */
   color: white;
   border: none;
-  padding: 10px 15px;
+  padding: 8px 12px;
   border-radius: 5px;
   cursor: pointer;
   transition: 0.3s;
   width: auto;
+  font-size: 12px;
 }
 
 #sendMessageBtn:hover {
@@ -445,12 +463,14 @@ button:disabled {
   padding: 10px;
   border-radius: 5px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  width: 290px; /* Genişliği 290px'e ayarlandı */
 }
 
 #welcomeMsg {
   margin: 0;
   font-weight: bold;
   color: #ddd;
+  font-size: 14px;
 }
 
 #logoutBtn {
