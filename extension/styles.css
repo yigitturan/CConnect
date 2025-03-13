@@ -53,6 +53,36 @@ button:disabled {
   color: #888;
 }
 
+/* Google ile giriş butonu stili */
+.google-btn {
+  background-color: #4285F4; /* Google mavi */
+  color: white;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.google-btn:hover {
+  background-color: #357ae8; /* Daha koyu mavi hover durumunda */
+}
+
+.google-btn::before {
+  content: "G";
+  font-weight: bold;
+  background: white;
+  color: #4285F4;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 10px;
+}
+
 .switch-screen {
   font-size: 0.9em;
   margin-top: 10px;
