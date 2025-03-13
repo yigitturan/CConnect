@@ -307,30 +307,32 @@ button:disabled {
 
 #roomInfo {
   background-color: #2d2d2d;
-  padding: 8px;
+  padding: 4px; /* Daha az padding */
   border-radius: 5px;
   margin-top: 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: 10px; /* Daha küçük font */
   color: #bbb;
   border: 1px solid #444;
+  height: auto;
+  max-height: 40px; /* Sabit maksimum yükseklik */
 }
 
 #roomInfo p {
-  margin: 4px 0;
+  margin: 2px 0; /* Daha az margin */
 }
 
 #videoStatus {
   font-weight: bold;
   color: #ddd;
+  font-size: 10px; /* Daha küçük font */
 }
 
 /* ✅ Chat Container */
 #chat-container {
-  height: auto;
-  max-height: 400px;
+  height: 250px; /* Sabit yükseklik - video görüşmesinin yaklaşık yarısı */
   overflow-y: auto;
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   background-color: #333;
@@ -344,23 +346,25 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 5px; /* Daha az margin */
 }
 
 .chat-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px; /* Daha küçük font */
   color: #ddd;
 }
 
 #chatRoomInfo {
-  font-size: 12px;
+  font-size: 10px; /* Daha küçük font */
   color: #a4ffa4;
-  margin: 0 0 10px 0;
-  padding: 5px;
+  margin: 0 0 5px 0; /* Daha az margin */
+  padding: 3px;
   background-color: #2d3d2d;
   border-radius: 4px;
   text-align: center;
+  height: 16px; /* Sabit yükseklik */
+  line-height: 16px; /* İçeriği dikey olarak ortalamak için */
 }
 
 #currentChatCode {
@@ -369,18 +373,18 @@ button:disabled {
 
 /* ✅ Mesajları Gösteren Alan */
 #messages-container {
-  max-height: 250px;
+  max-height: 150px; /* Chat container içinde daha az yer kaplasın */
   overflow-y: auto;
   border: 1px solid #444;
   background-color: #2d2d2d;
   text-align: left;
-  margin-bottom: 10px;
+  margin-bottom: 5px; /* Daha az margin */
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 10px;
-  border-radius: 10px;
-  width: calc(100% - 22px); /* Paddingi hesaba katarak genişlik */
+  gap: 3px; /* Daha az boşluk */
+  padding: 8px;
+  border-radius: 8px;
+  width: calc(100% - 18px); /* Paddingi hesaba katarak genişlik */
 }
 
 /* ✅ Gönderilen Mesaj (Senin Mesajın) */
@@ -390,12 +394,12 @@ button:disabled {
   align-self: flex-end;
   text-align: right;
   max-width: 70%;
-  padding: 8px 12px;
-  border-radius: 15px 15px 0px 15px;
-  font-size: 14px;
+  padding: 6px 10px; /* Daha az padding */
+  border-radius: 12px 12px 0px 12px;
+  font-size: 12px; /* Daha küçük font */
   word-wrap: break-word;
   display: inline-block;
-  margin-bottom: 5px;
+  margin-bottom: 3px; /* Daha az margin */
 }
 
 /* ✅ Alınan Mesaj (Başka Kullanıcıdan Gelen) */
@@ -404,12 +408,12 @@ button:disabled {
   align-self: flex-start;
   text-align: left;
   max-width: 70%;
-  padding: 8px 12px;
-  border-radius: 15px 15px 15px 0px;
-  font-size: 14px;
+  padding: 6px 10px; /* Daha az padding */
+  border-radius: 12px 12px 12px 0px;
+  font-size: 12px; /* Daha küçük font */
   word-wrap: break-word;
   display: inline-block;
-  margin-bottom: 5px;
+  margin-bottom: 3px; /* Daha az margin */
   color: #eee;
 }
 
@@ -417,19 +421,21 @@ button:disabled {
 #message-box {
   display: flex;
   gap: 5px;
-  margin-top: 10px;
+  margin-top: 5px; /* Daha az margin */
   width: 100%;
+  height: 30px; /* Sabit yükseklik */
 }
 
 #messageInput {
   flex-grow: 1;
-  padding: 8px 10px;
+  padding: 6px 8px; /* Daha az padding */
   border: 1px solid #444;
   border-radius: 5px;
-  width: calc(100% - 20px);
+  width: calc(100% - 18px);
   background-color: #3a3a3a;
   color: #eee;
-  font-size: 13px;
+  font-size: 12px; /* Daha küçük font */
+  height: 18px; /* Sabit yükseklik */
 }
 
 /* 📌 Gönder Butonu */
@@ -437,12 +443,13 @@ button:disabled {
   background-color: #215283; /* Koyu mavi */
   color: white;
   border: none;
-  padding: 8px 12px;
+  padding: 6px 10px; /* Daha az padding */
   border-radius: 5px;
   cursor: pointer;
   transition: 0.3s;
   width: auto;
-  font-size: 12px;
+  font-size: 11px; /* Daha küçük font */
+  height: 30px; /* Sabit yükseklik */
 }
 
 #sendMessageBtn:hover {
@@ -487,7 +494,7 @@ button:disabled {
 
 /* Scrollbar stili */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px; /* Daha ince scrollbar */
 }
 
 ::-webkit-scrollbar-track {
