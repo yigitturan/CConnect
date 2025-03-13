@@ -279,30 +279,76 @@ button:disabled {
   border: 1px solid #444;
 }
 
-.controls {
+/* Medya Kontrolleri */
+.media-controls {
   display: flex;
-  gap: 8px;
-  margin: 8px 0;
+  gap: 4px; /* Aralığı azalttım */
+  margin: 6px 0;
   justify-content: center;
+  align-items: center;
 }
 
-.controls button {
-  width: auto;
-  padding: 6px 12px;
-  font-size: 13px;
+.media-control-btn {
   background-color: #444;
+  border: none;
+  border-radius: 50%;
+  width: 30px; /* Genişliği azalttım */
+  height: 30px; /* Yüksekliği azalttım */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0; /* Paddingi sıfırladım */
 }
 
-.controls button:hover {
+.media-control-btn:hover {
   background-color: #555;
 }
 
+.media-control-btn svg {
+  width: 14px; /* SVG boyutunu azalttım */
+  height: 14px; /* SVG boyutunu azalttım */
+  color: white;
+}
+
+#startButton, #hangupButton {
+  border-radius: 15px; /* Yuvarlaklığı azalttım */
+  width: auto;
+  padding: 0 10px; /* Paddingi azalttım */
+  height: 28px; /* Yüksekliği azalttım */
+  font-size: 10px; /* Font boyutunu azalttım */
+  font-weight: bold;
+}
+
+#startButton {
+  background-color: #4CAF50;
+}
+
+#startButton:hover {
+  background-color: #45a049;
+}
+
 #hangupButton {
-  background-color: #8e3941; /* Koyu kırmızı */
+  background-color: #8e3941;
 }
 
 #hangupButton:hover {
   background-color: #aa454e;
+}
+
+.media-control-btn.disabled {
+  background-color: #666;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.media-control-btn.active {
+  background-color: #4CAF50;
+}
+
+.media-control-btn.inactive {
+  background-color: #f44336;
 }
 
 #roomInfo {
