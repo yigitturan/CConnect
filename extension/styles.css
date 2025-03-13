@@ -77,91 +77,128 @@ button:disabled {
   height: 100%;
 }
 
-/* ✅ Video Chat Bölümü */
-#video-chat-section {
-  margin-bottom: 10px;
-  padding: 8px;
-  background-color: #383b45; /* Hafif mavi-gri tonu */
+/* Kod Oluşturma Bölümü */
+#code-creation-section {
+  margin-bottom: 15px;
+  background-color: #333;
+  padding: 12px 10px;
   border-radius: 8px;
-  border: 1px solid #4b5164;
-  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
-.video-chat-info {
-  margin-bottom: 5px;
-}
-
-.video-chat-info h3 {
-  font-size: 16px;
-  margin: 5px 0;
-  color: #dbe4ff;
-}
-
-/* Daha kompakt buton ve kontrol stilleri */
-.video-controls {
+.room-buttons {
   display: flex;
-  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .primary-button {
-  background-color: #3f4490; /* Koyu mor-mavi */
   color: white;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 14px;
   border-radius: 5px;
   border: none;
   cursor: pointer;
   transition: all 0.3s ease;
-  width: auto;
+  width: 50%;
   display: inline-block;
 }
 
-.primary-button:hover {
+.video-btn {
+  background-color: #3f4490; /* Koyu mor-mavi */
+}
+
+.video-btn:hover {
   background-color: #4a50a7;
 }
 
-.room-controls {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 5px;
+.chat-btn {
+  background-color: #3f7744; /* Koyu yeşil */
 }
 
-.room-controls input {
-  flex-grow: 1;
-  padding: 5px;
+.chat-btn:hover {
+  background-color: #4a8b50;
+}
+
+.code-display {
+  background-color: #2d2d2d;
+  padding: 8px;
+  border-radius: 5px;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #bbb;
   border: 1px solid #444;
-  border-radius: 4px;
-  font-size: 12px;
-  min-width: 100px;
-  margin: 0;
-  background-color: #3a3a3a;
-  color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.room-controls button {
-  padding: 5px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+.code-display p {
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.code-display span {
+  font-weight: bold;
+  color: #fff;
+  margin: 0 5px;
+}
+
+.copy-btn {
+  background-color: #555;
+  font-size: 12px;
+  padding: 4px 8px;
+  margin-left: 5px;
   width: auto;
 }
 
-#joinRoomBtn {
+.copy-btn:hover {
+  background-color: #666;
+}
+
+/* Kod Giriş Bölümü */
+#code-entry-section {
+  margin-bottom: 15px;
+  background-color: #333;
+  padding: 12px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.code-entry {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.code-entry input {
+  flex-grow: 1;
+  margin-right: 5px;
+  font-size: 14px;
+}
+
+.code-entry button {
+  width: 50%;
+  font-size: 13px;
+}
+
+#joinVideoRoomBtn {
   background-color: #5522b1; /* Koyu mor */
 }
 
-#joinRoomBtn:hover {
+#joinVideoRoomBtn:hover {
   background-color: #6632c8;
 }
 
-#copyRoomIdBtn {
-  background-color: #146375; /* Koyu turkuaz */
+#joinChatRoomBtn {
+  background-color: #22b155; /* Koyu yeşil */
 }
 
-#copyRoomIdBtn:hover {
-  background-color: #1a7d92;
+#joinChatRoomBtn:hover {
+  background-color: #32c868;
 }
 
 /* ✅ Video Görüşme Container */
@@ -188,8 +225,8 @@ button:disabled {
   color: #ddd;
 }
 
-.back-button {
-  background-color: #555;
+.close-button {
+  background-color: #8e3941; /* Koyu kırmızı */
   color: white;
   border: none;
   padding: 4px 8px;
@@ -199,8 +236,8 @@ button:disabled {
   font-size: 12px;
 }
 
-.back-button:hover {
-  background-color: #666;
+.close-button:hover {
+  background-color: #aa454e;
 }
 
 /* Kamera görünümleri */
@@ -275,8 +312,8 @@ button:disabled {
   color: #ddd;
 }
 
-/* ✅ Chat Alanı */
-#chat-screen {
+/* ✅ Chat Container */
+#chat-container {
   height: auto;
   max-height: 400px;
   overflow-y: auto;
@@ -286,13 +323,34 @@ button:disabled {
   background-color: #333;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  margin-bottom: 10px;
 }
 
-#chat-screen h3 {
-  margin-top: 0;
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 10px;
+}
+
+.chat-header h3 {
+  margin: 0;
   font-size: 16px;
   color: #ddd;
+}
+
+#chatRoomInfo {
+  font-size: 12px;
+  color: #a4ffa4;
+  margin: 0 0 10px 0;
+  padding: 5px;
+  background-color: #2d3d2d;
+  border-radius: 4px;
+  text-align: center;
+}
+
+#currentChatCode {
+  font-weight: bold;
 }
 
 /* ✅ Mesajları Gösteren Alan */
@@ -366,6 +424,7 @@ button:disabled {
   border-radius: 5px;
   cursor: pointer;
   transition: 0.3s;
+  width: auto;
 }
 
 #sendMessageBtn:hover {
@@ -399,6 +458,7 @@ button:disabled {
   padding: 5px 10px;
   font-size: 12px;
   margin: 0;
+  width: auto;
 }
 
 #logoutBtn:hover {

@@ -1,236 +1,513 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const loginScreen = document.getElementById("login-screen");
-    const signupScreen = document.getElementById("signup-screen");
-    const appContainer = document.getElementById("app-container");
-    const userInfoDiv = document.getElementById("user-info");
-    const chatScreen = document.getElementById("chat-screen");
-    const messagesContainer = document.getElementById("messages-container");
-    const videoContainer = document.getElementById("video-chat-container");
-    
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const signupEmailInput = document.getElementById("signup-email");
-    const signupPasswordInput = document.getElementById("signup-password");
-    const nicknameInput = document.getElementById("nickname");
-    
-    const loginBtn = document.getElementById("loginBtn");
-    const signupBtn = document.getElementById("signupBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    
-    const messageInput = document.getElementById("messageInput");
-    const sendMessageBtn = document.getElementById("sendMessageBtn");
-    
-    // Video Chat elements
-    const openVideoChatBtn = document.getElementById("openVideoChatBtn");
-    const collapseVideoChatBtn = document.getElementById("collapseVideoChat");
-    const roomControlsSection = document.getElementById("roomControlsSection");
-    const roomIdInput = document.getElementById("roomIdInput");
-    const joinRoomBtn = document.getElementById("joinRoomBtn");
-    const copyRoomIdBtn = document.getElementById("copyRoomIdBtn");
-    
-    let currentUserNickname = "";
-    let currentRoomId = "";
-    const statusP = document.getElementById("status");
-    
-    // Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyB69u3UFUyEX0F237B7MKMRTm-mfSvEqJU",
-      authDomain: "cconnectyigit.firebaseapp.com",
-      databaseURL: "https://cconnectyigit-default-rtdb.firebaseio.com",
-      projectId: "cconnectyigit",
-      storageBucket: "cconnectyigit.appspot.com",
-      messagingSenderId: "731610663845",
-      appId: "1:731610663845:web:c0c1f537d86e391169764c",
-      measurementId: "G-ZFHHZN4V5P"
-    };
-    
-    // Initialize Firebase
-    if (!firebase.apps || !firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
+  const loginScreen = document.getElementById("login-screen");
+  const signupScreen = document.getElementById("signup-screen");
+  const appContainer = document.getElementById("app-container");
+  const userInfoDiv = document.getElementById("user-info");
+  const chatContainer = document.getElementById("chat-container");
+  const videoContainer = document.getElementById("video-chat-container");
+  const messagesContainer = document.getElementById("messages-container");
+  
+  const emailInput = document.getElementById("email");
+  const passwordInput = document.getElementById("password");
+  const signupEmailInput = document.getElementById("signup-email");
+  const signupPasswordInput = document.getElementById("signup-password");
+  const nicknameInput = document.getElementById("nickname");
+  
+  const loginBtn = document.getElementById("loginBtn");
+  const signupBtn = document.getElementById("signupBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  
+  const messageInput = document.getElementById("messageInput");
+  const sendMessageBtn = document.getElementById("sendMessageBtn");
+  
+  // Kod Oluşturma Elemanları
+  const createVideoChatCodeBtn = document.getElementById("createVideoChatCodeBtn");
+  const createChatCodeBtn = document.getElementById("createChatCodeBtn");
+  const videoCodeDisplay = document.getElementById("videoCodeDisplay");
+  const chatCodeDisplay = document.getElementById("chatCodeDisplay");
+  const generatedVideoCode = document.getElementById("generatedVideoCode");
+  const generatedChatCode = document.getElementById("generatedChatCode");
+  const copyVideoCodeBtn = document.getElementById("copyVideoCodeBtn");
+  const copyChatCodeBtn = document.getElementById("copyChatCodeBtn");
+  
+  // Kod Giriş Elemanları
+  const videoCodeInput = document.getElementById("videoCodeInput");
+  const chatCodeInput = document.getElementById("chatCodeInput");
+  const joinVideoRoomBtn = document.getElementById("joinVideoRoomBtn");
+  const joinChatRoomBtn = document.getElementById("joinChatRoomBtn");
+  const currentVideoCode = document.getElementById("currentVideoCode");
+  const currentChatCode = document.getElementById("currentChatCode");
+  
+  // Kapat Butonları
+  const closeVideoChat = document.getElementById("closeVideoChat");
+  const closeChatRoom = document.getElementById("closeChatRoom");
+  
+  // Video Chat Elemanları
+  const startButton = document.getElementById("startButton");
+  const hangupButton = document.getElementById("hangupButton");
+  const videoStatus = document.getElementById("videoStatus");
+  
+  let currentUserNickname = "";
+  let currentVideoRoomId = "";
+  let currentChatRoomId = "";
+  let currentMessagesRef = null;
+  let messagesListener = null;
+  const statusP = document.getElementById("status");
+  
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyB69u3UFUyEX0F237B7MKMRTm-mfSvEqJU",
+    authDomain: "cconnectyigit.firebaseapp.com",
+    databaseURL: "https://cconnectyigit-default-rtdb.firebaseio.com",
+    projectId: "cconnectyigit",
+    storageBucket: "cconnectyigit.appspot.com",
+    messagingSenderId: "731610663845",
+    appId: "1:731610663845:web:c0c1f537d86e391169764c",
+    measurementId: "G-ZFHHZN4V5P"
+  };
+  
+  // Initialize Firebase
+  if (!firebase.apps || !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  const database = firebase.database();
+  
+  document.getElementById("showSignup").addEventListener("click", (event) => {
+    event.preventDefault();
+    loginScreen.classList.add("hidden");
+    signupScreen.classList.remove("hidden");
+  });
+  
+  document.getElementById("showLogin").addEventListener("click", (event) => {
+    event.preventDefault();
+    signupScreen.classList.add("hidden");
+    loginScreen.classList.remove("hidden");
+  });
+  
+  // Kullanıcı renklerini belirleme
+  const colorMap = new Map();
+  function getRandomColor() {
+    const colors = ["#8E44AD", "#C0392B", "#D35400", "#27AE60", "#2980B9"]; 
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+  
+  function getUserColor(username) {
+    if (!colorMap.has(username)) {
+      colorMap.set(username, getRandomColor());
     }
-    const database = firebase.database();
+    return colorMap.get(username);
+  }
+  
+  // Rastgele kod oluşturma (6 karakter alfanümerik)
+  function generateRandomCode() {
+    const codeChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += codeChars.charAt(Math.floor(Math.random() * codeChars.length));
+    }
+    return code;
+  }
+  
+  // Hata veya durum mesajları gösterme
+  function showStatus(message, isError = false) {
+    statusP.textContent = message;
+    statusP.style.color = isError ? "red" : "green";
+    setTimeout(() => {
+      statusP.textContent = "";
+    }, 5000);
+  }
+  
+  // Kayıt olma işlemi
+  signupBtn.addEventListener("click", () => {
+    const email = signupEmailInput.value.trim();
+    const password = signupPasswordInput.value.trim();
+    const nickname = nicknameInput.value.trim();
     
-    document.getElementById("showSignup").addEventListener("click", (event) => {
-      event.preventDefault();
-      loginScreen.classList.add("hidden");
-      signupScreen.classList.remove("hidden");
-    });
-    
-    document.getElementById("showLogin").addEventListener("click", (event) => {
-      event.preventDefault();
-      signupScreen.classList.add("hidden");
-      loginScreen.classList.remove("hidden");
-    });
-    
-    // Kullanıcı renklerini belirleme
-    const colorMap = new Map();
-    function getRandomColor() {
-      const colors = ["#8E44AD", "#C0392B", "#D35400", "#27AE60", "#2980B9"]; 
-      return colors[Math.floor(Math.random() * colors.length)];
+    if (!email || !password || !nickname) {
+      showStatus("Tüm alanları doldurun!", true);
+      return;
     }
     
-    function getUserColor(username) {
-      if (!colorMap.has(username)) {
-        colorMap.set(username, getRandomColor());
-      }
-      return colorMap.get(username);
-    }
-    
-    // Hata veya durum mesajları gösterme
-    function showStatus(message, isError = false) {
-      statusP.textContent = message;
-      statusP.style.color = isError ? "red" : "green";
-      setTimeout(() => {
-        statusP.textContent = "";
-      }, 5000);
-    }
-    
-    // Kayıt olma işlemi
-    signupBtn.addEventListener("click", () => {
-      const email = signupEmailInput.value.trim();
-      const password = signupPasswordInput.value.trim();
-      const nickname = nicknameInput.value.trim();
-      
-      if (!email || !password || !nickname) {
-        showStatus("Tüm alanları doldurun!", true);
-        return;
-      }
-      
-      chrome.runtime.sendMessage({ action: "signup", email, password, nickname }, (response) => {
-        if (response?.success) {
-          loginScreen.classList.remove("hidden");
-          signupScreen.classList.add("hidden");
-          showStatus("Kayıt başarılı, şimdi giriş yapabilirsiniz.");
-        } else {
-          showStatus("Kayıt hatası: " + (response.error || "Bilinmeyen hata"), true);
-        }
-      });
-    });
-    
-    // Giriş yapma işlemi
-    loginBtn.addEventListener("click", () => {
-      const email = emailInput.value.trim();
-      const password = passwordInput.value.trim();
-      
-      if (!email || !password) {
-        showStatus("Lütfen tüm alanları doldurun!", true);
-        return;
-      }
-      
-      chrome.runtime.sendMessage({ action: "login", email, password }, (response) => {
-        if (response?.success) {
-          currentUserNickname = response.nickname;
-          loginScreen.classList.add("hidden");
-          signupScreen.classList.add("hidden");
-          appContainer.classList.remove("hidden");
-          document.getElementById("welcomeMsg").textContent = `Merhaba, ${currentUserNickname}`;
-          loadMessages();
-        } else {
-          showStatus("Giriş hatası: " + (response.error || "Bilinmeyen hata"), true);
-        }
-      });
-    });
-    
-    // Çıkış yapma işlemi
-    logoutBtn.addEventListener("click", () => {
-      chrome.runtime.sendMessage({ action: "logout" }, (response) => {
-        if (response?.success) {
-          loginScreen.classList.remove("hidden");
-          appContainer.classList.add("hidden");
-          videoContainer.classList.add("hidden");
-          messagesContainer.innerHTML = "";
-          
-          // Video chat'i kapat
-          if (window.currentPeerConnection) {
-            window.currentPeerConnection.close();
-            window.currentPeerConnection = null;
-          }
-        }
-      });
-    });
-    
-    // Video görüşme toggle
-    collapseVideoChatBtn.addEventListener("click", () => {
-      if (videoContainer.classList.contains("hidden")) {
-        videoContainer.classList.remove("hidden");
-        collapseVideoChatBtn.textContent = "Gizle";
+    chrome.runtime.sendMessage({ action: "signup", email, password, nickname }, (response) => {
+      if (response?.success) {
+        loginScreen.classList.remove("hidden");
+        signupScreen.classList.add("hidden");
+        showStatus("Kayıt başarılı, şimdi giriş yapabilirsiniz.");
       } else {
-        videoContainer.classList.add("hidden");
-        collapseVideoChatBtn.textContent = "Göster";
+        showStatus("Kayıt hatası: " + (response.error || "Bilinmeyen hata"), true);
       }
     });
+  });
+  
+  // Giriş yapma işlemi
+  loginBtn.addEventListener("click", () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
     
-    // Video görüşmesi başlatma işlemi
-    openVideoChatBtn.addEventListener("click", async () => {
-      try {
-        // Rastgele bir oda ID'si oluştur
-        const roomId = Math.floor(Math.random() * 1000000000).toString();
-        
-        // Oda ID'sini kaydet ve görüntüle
-        currentRoomId = roomId;
-        roomIdInput.value = roomId;
-        roomControlsSection.classList.remove('hidden');
-        
-        // Video görüşme penceresini aç
-        openVideoChatWindow(roomId);
-      } catch (error) {
-        console.error('Error creating room:', error);
-        alert('Oda oluşturma hatası: ' + error.message);
+    if (!email || !password) {
+      showStatus("Lütfen tüm alanları doldurun!", true);
+      return;
+    }
+    
+    chrome.runtime.sendMessage({ action: "login", email, password }, (response) => {
+      if (response?.success) {
+        currentUserNickname = response.nickname;
+        loginScreen.classList.add("hidden");
+        signupScreen.classList.add("hidden");
+        appContainer.classList.remove("hidden");
+        document.getElementById("welcomeMsg").textContent = `Merhaba, ${currentUserNickname}`;
+      } else {
+        showStatus("Giriş hatası: " + (response.error || "Bilinmeyen hata"), true);
       }
     });
+  });
+  
+  // Çıkış yapma işlemi
+  logoutBtn.addEventListener("click", () => {
+    // Aktif odalardan çık
+    closeVideoChatRoom();
+    closeChatRoomFunc();
     
-    // Odaya katılma işlemi
-    joinRoomBtn.addEventListener("click", async () => {
-      const roomId = roomIdInput.value.trim();
+    chrome.runtime.sendMessage({ action: "logout" }, (response) => {
+      if (response?.success) {
+        loginScreen.classList.remove("hidden");
+        appContainer.classList.add("hidden");
+        resetAllRooms();
+      }
+    });
+  });
+  
+  // Tüm odaları ve durumları sıfırla
+  function resetAllRooms() {
+    // Video odası sıfırlama
+    videoContainer.classList.add("hidden");
+    currentVideoRoomId = "";
+    currentVideoCode.textContent = "---";
+    videoCodeInput.value = "";
+    videoCodeDisplay.classList.add("hidden");
+    generatedVideoCode.textContent = "-";
+    
+    // Chat odası sıfırlama
+    chatContainer.classList.add("hidden");
+    currentChatRoomId = "";
+    currentChatCode.textContent = "---";
+    chatCodeInput.value = "";
+    chatCodeDisplay.classList.add("hidden");
+    generatedChatCode.textContent = "-";
+    
+    // Mesajları temizle
+    messagesContainer.innerHTML = "";
+    messageInput.value = "";
+    
+    // Dinleyicileri kaldır
+    if (messagesListener && currentMessagesRef) {
+      currentMessagesRef.off("value", messagesListener);
+      messagesListener = null;
+      currentMessagesRef = null;
+    }
+  }
+  
+  // Video Kodu Oluşturma
+  createVideoChatCodeBtn.addEventListener("click", async () => {
+    const code = generateRandomCode();
+    
+    try {
+      // Firebase'de oda oluştur
+      const roomRef = database.ref('videoRooms/' + code);
       
-      if (!roomId) {
-        alert('Lütfen bir Oda ID girin');
+      // Odanın var olup olmadığını kontrol et
+      const snapshot = await roomRef.once('value');
+      if (snapshot.exists()) {
+        alert("Bu kod zaten kullanılıyor. Lütfen tekrar deneyin.");
+        return;
+      }
+      
+      // Yeni odayı kaydet
+      await roomRef.set({
+        createdBy: currentUserNickname,
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+      });
+      
+      // Arayüzü güncelle
+      generatedVideoCode.textContent = code;
+      videoCodeDisplay.classList.remove("hidden");
+      
+      console.log(`Video odası kodu oluşturuldu: ${code}`);
+    } catch (error) {
+      console.error("Video kodu oluşturma hatası:", error);
+      alert("Video kodu oluşturulurken bir hata oluştu: " + error.message);
+    }
+  });
+  
+  // Chat Kodu Oluşturma
+  createChatCodeBtn.addEventListener("click", async () => {
+    const code = generateRandomCode();
+    
+    try {
+      // Firebase'de oda oluştur
+      const roomRef = database.ref('chatRooms/' + code);
+      
+      // Odanın var olup olmadığını kontrol et
+      const snapshot = await roomRef.once('value');
+      if (snapshot.exists()) {
+        alert("Bu kod zaten kullanılıyor. Lütfen tekrar deneyin.");
+        return;
+      }
+      
+      // Yeni odayı kaydet
+      await roomRef.set({
+        createdBy: currentUserNickname,
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+      });
+      
+      // Arayüzü güncelle
+      generatedChatCode.textContent = code;
+      chatCodeDisplay.classList.remove("hidden");
+      
+      console.log(`Chat odası kodu oluşturuldu: ${code}`);
+      } catch (error) {
+        console.error("Chat kodu oluşturma hatası:", error);
+        alert("Chat kodu oluşturulurken bir hata oluştu: " + error.message);
+      }
+    });
+    
+    // Video kodu kopyalama
+    copyVideoCodeBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(generatedVideoCode.textContent).then(() => {
+        alert("Video kodu kopyalandı!");
+      }).catch(err => {
+        console.error("Kopyalama hatası:", err);
+        // Alternatif kopyalama yöntemi
+        const tempInput = document.createElement("input");
+        tempInput.value = generatedVideoCode.textContent;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        alert("Video kodu kopyalandı!");
+      });
+    });
+    
+    // Chat kodu kopyalama
+    copyChatCodeBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(generatedChatCode.textContent).then(() => {
+        alert("Chat kodu kopyalandı!");
+      }).catch(err => {
+        console.error("Kopyalama hatası:", err);
+        // Alternatif kopyalama yöntemi
+        const tempInput = document.createElement("input");
+        tempInput.value = generatedChatCode.textContent;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        alert("Chat kodu kopyalandı!");
+      });
+    });
+    
+    // Video odasına katılma
+    joinVideoRoomBtn.addEventListener("click", async () => {
+      const code = videoCodeInput.value.trim();
+      if (!code) {
+        alert("Lütfen bir video kodu girin.");
         return;
       }
       
       try {
         // Oda var mı kontrol et
-        const roomRef = database.ref('rooms/' + roomId);
-        const roomSnapshot = await roomRef.once('value');
+        const roomRef = database.ref('videoRooms/' + code);
+        const snapshot = await roomRef.once('value');
         
-        if (!roomSnapshot.exists()) {
-          alert('Oda bulunamadı. Lütfen Oda ID\'yi kontrol edin.');
+        if (!snapshot.exists()) {
+          alert("Geçersiz video kodu. Lütfen doğru kodu girdiğinizden emin olun.");
           return;
         }
         
-        currentRoomId = roomId;
+        // Odaya katıl
+        currentVideoRoomId = code;
+        currentVideoCode.textContent = code;
+        videoContainer.classList.remove("hidden");
         
-        // Video görüşme penceresini aç
-        openVideoChatWindow(roomId);
+        // Video chat başlat
+        initializeVideoChat(code);
+        
+        console.log(`Video odasına katılındı: ${code}`);
       } catch (error) {
-        console.error('Error joining room:', error);
-        alert('Odaya katılma hatası: ' + error.message);
+        console.error("Video odasına katılma hatası:", error);
+        alert("Video odasına katılırken bir hata oluştu: " + error.message);
       }
     });
     
-    // Oda ID'yi kopyala
-    copyRoomIdBtn.addEventListener("click", () => {
-      roomIdInput.select();
-      document.execCommand('copy');
-      alert('Oda ID kopyalandı!');
-    });
-    
-    // Video görüşme penceresini aç
-    function openVideoChatWindow(roomId) {
-      // Video chat alanını görünür yap
-      videoContainer.classList.remove('hidden');
-      
-      // Oda ID'sini göster
-      document.getElementById('roomIdDisplay').textContent = roomId;
-      
-      // Eğer mevcut bir görüşme varsa kapat
-      if (window.currentPeerConnection) {
-        window.currentPeerConnection.close();
-        window.currentPeerConnection = null;
+    // Chat odasına katılma
+    joinChatRoomBtn.addEventListener("click", async () => {
+      const code = chatCodeInput.value.trim();
+      if (!code) {
+        alert("Lütfen bir chat kodu girin.");
+        return;
       }
       
-      // Video chat başlat
-      initializeVideoChat(roomId);
+      try {
+        // Oda var mı kontrol et
+        const roomRef = database.ref('chatRooms/' + code);
+        const snapshot = await roomRef.once('value');
+        
+        if (!snapshot.exists()) {
+          alert("Geçersiz chat kodu. Lütfen doğru kodu girdiğinizden emin olun.");
+          return;
+        }
+        
+        // Aktif başka bir chat odası varsa önce onu kapat
+        if (currentChatRoomId) {
+          closeChatRoomFunc();
+        }
+        
+        // Odaya katıl
+        currentChatRoomId = code;
+        currentChatCode.textContent = code;
+        chatContainer.classList.remove("hidden");
+        
+        // Mesajları yükle
+        loadChatRoomMessages(code);
+        
+        console.log(`Chat odasına katılındı: ${code}`);
+      } catch (error) {
+        console.error("Chat odasına katılma hatası:", error);
+        alert("Chat odasına katılırken bir hata oluştu: " + error.message);
+      }
+    });
+    
+    // Video chat kapatma
+    closeVideoChat.addEventListener("click", () => {
+      closeVideoChatRoom();
+    });
+    
+    // Chat odası kapatma
+    closeChatRoom.addEventListener("click", () => {
+      closeChatRoomFunc();
+    });
+    
+    // Video chat odasını kapat
+    function closeVideoChatRoom() {
+      if (currentVideoRoomId) {
+        // WebRTC bağlantısını kapat
+        if (window.currentPeerConnection) {
+          window.currentPeerConnection.close();
+          window.currentPeerConnection = null;
+        }
+        
+        // Yerel ve uzak medya akışını kapat
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        
+        if (localVideo.srcObject) {
+          localVideo.srcObject.getTracks().forEach(track => track.stop());
+          localVideo.srcObject = null;
+        }
+        
+        if (remoteVideo.srcObject) {
+          remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+          remoteVideo.srcObject = null;
+        }
+        
+        // Firebase dinleyicilerini kaldır
+        const roomRef = database.ref('rooms/' + currentVideoRoomId);
+        roomRef.off();
+        
+        // UI güncelle
+        videoContainer.classList.add('hidden');
+        startButton.disabled = false;
+        hangupButton.disabled = true;
+        videoStatus.textContent = "Başlamak için kamerayı başlat";
+        currentVideoRoomId = "";
+        currentVideoCode.textContent = "---";
+        
+        console.log("Video chat odası kapatıldı.");
+      }
+    }
+    
+    // Chat odasını kapat
+    function closeChatRoomFunc() {
+      if (currentChatRoomId) {
+        // Mesaj dinleyicisini kaldır
+        if (messagesListener && currentMessagesRef) {
+          currentMessagesRef.off("value", messagesListener);
+          messagesListener = null;
+        }
+        
+        // Arayüzü güncelle
+        chatContainer.classList.add("hidden");
+        messagesContainer.innerHTML = "";
+        messageInput.value = "";
+        currentChatRoomId = "";
+        currentChatCode.textContent = "---";
+        currentMessagesRef = null;
+        
+        console.log("Chat odası kapatıldı.");
+      }
+    }
+    
+    // Chat odası mesajlarını yükle
+    function loadChatRoomMessages(roomCode) {
+      // Önce mevcut dinleyiciyi temizle
+      if (messagesListener && currentMessagesRef) {
+        currentMessagesRef.off("value", messagesListener);
+      }
+      
+      // Yeni mesaj referansını ayarla
+      currentMessagesRef = database.ref('chatMessages/' + roomCode);
+      
+      // Mesajları dinlemeye başla
+      messagesListener = currentMessagesRef.on("value", (snapshot) => {
+        messagesContainer.innerHTML = "";
+        
+        if (snapshot.exists()) {
+          const messages = snapshot.val();
+          
+          Object.values(messages).forEach((message) => {
+            const messageElement = document.createElement("div");
+            messageElement.textContent = `${message.sender}: ${message.text}`;
+            messageElement.classList.add(message.sender === currentUserNickname ? "sent-message" : "received-message");
+            messageElement.style.backgroundColor = getUserColor(message.sender);
+            
+            messagesContainer.appendChild(messageElement);
+          });
+          
+          scrollToBottom();
+        }
+      });
+    }
+    
+    // Mesaj gönderme
+    sendMessageBtn.addEventListener("click", sendMessage);
+    messageInput.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+    
+    async function sendMessage() {
+      const message = messageInput.value.trim();
+      if (!message || !currentChatRoomId) return;
+      
+      const newMessage = {
+        sender: currentUserNickname,
+        text: message,
+        timestamp: Date.now()
+      };
+      
+      try {
+        // Chat odası mesajı gönder
+        await database.ref('chatMessages/' + currentChatRoomId).push(newMessage);
+        messageInput.value = "";
+      } catch (error) {
+        console.error("Mesaj gönderme hatası:", error);
+        alert("Mesaj gönderilirken bir hata oluştu: " + error.message);
+      }
+    }
+    
+    function scrollToBottom() {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
     
     // Video chat işlevlerini başlat
@@ -244,9 +521,6 @@ document.addEventListener("DOMContentLoaded", () => {
       // HTML elementleri
       const localVideo = document.getElementById('localVideo');
       const remoteVideo = document.getElementById('remoteVideo');
-      const startButton = document.getElementById('startButton');
-      const hangupButton = document.getElementById('hangupButton');
-      const statusElement = document.getElementById('videoStatus');
       
       // STUN/TURN sunucuları - daha fazla ve güvenilir sunucu eklendi
       const servers = {
@@ -552,77 +826,8 @@ document.addEventListener("DOMContentLoaded", () => {
       
       // Durumu güncelle
       function updateStatus(message) {
-        statusElement.textContent = message;
+        videoStatus.textContent = message;
         console.log("Durum:", message);
       }
     }
-    
-    // Mesaj gönderme işlemi
-    sendMessageBtn.addEventListener("click", sendMessage);
-    messageInput.addEventListener("keypress", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        sendMessage();
-      }
-    });
-    
-    async function sendMessage() {
-      const message = messageInput.value.trim();
-      if (message === "") return;
-      
-      const newMessage = {
-        sender: currentUserNickname,
-        text: message,
-        timestamp: Date.now()
-      };
-      
-      try {
-        const response = await fetch("https://cconnectyigit-default-rtdb.firebaseio.com/messages.json", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newMessage)
-        });
-        
-        if (!response.ok) {
-          throw new Error("Mesaj gönderme başarısız");
-        }
-        
-        messageInput.value = "";
-        setTimeout(loadMessages, 500);
-      } catch (error) {
-        console.error("Mesaj gönderme hatası:", error);
-      }
-    }
-    
-    // Mesajları yükleme fonksiyonu
-    async function loadMessages() {
-      try {
-        const response = await fetch("https://cconnectyigit-default-rtdb.firebaseio.com/messages.json");
-        if (!response.ok) throw new Error("Mesajları alma başarısız");
-        
-        const data = await response.json();
-        messagesContainer.innerHTML = "";
-        
-        if (data && Object.keys(data).length > 0) {
-          Object.values(data).forEach((message) => {
-            const messageElement = document.createElement("div");
-            messageElement.textContent = `${message.sender}: ${message.text}`;
-            messageElement.classList.add(message.sender === currentUserNickname ? "sent-message" : "received-message");
-            messageElement.style.backgroundColor = getUserColor(message.sender);
-            
-            messagesContainer.appendChild(messageElement);
-          });
-          
-          scrollToBottom();
-        }
-      } catch (error) {
-        console.error("Mesajları yükleme hatası:", error);
-      }
-    }
-    
-    function scrollToBottom() {
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-    
-    setInterval(loadMessages, 3000);
 });

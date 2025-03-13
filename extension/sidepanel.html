@@ -38,20 +38,36 @@
       <button id="logoutBtn">Çıkış Yap</button>
     </div>
     
-    <!-- Video Görüşme Bölümü -->
-    <div id="video-chat-section">
-      <div class="video-chat-info">
-        <h3>Video Görüşmesi</h3>
+    <!-- Kod Oluşturma Bölümü -->
+    <div id="code-creation-section">
+      <div class="room-buttons">
+        <button id="createVideoChatCodeBtn" class="primary-button video-btn">Video Kodu Oluştur</button>
+        <button id="createChatCodeBtn" class="primary-button chat-btn">Chat Kodu Oluştur</button>
       </div>
       
-      <div class="video-controls">
-        <button id="openVideoChatBtn" class="primary-button">Video Görüşmesi Başlat</button>
+      <div id="videoCodeDisplay" class="code-display hidden">
+        <p>Video Kodu: <span id="generatedVideoCode">-</span> 
+          <button id="copyVideoCodeBtn" class="copy-btn">Kopyala</button>
+        </p>
       </div>
       
-      <div class="room-controls hidden" id="roomControlsSection">
-        <input id="roomIdInput" placeholder="Oda ID" />
-        <button id="joinRoomBtn">Katıl</button>
-        <button id="copyRoomIdBtn">Kopyala</button>
+      <div id="chatCodeDisplay" class="code-display hidden">
+        <p>Chat Kodu: <span id="generatedChatCode">-</span>
+          <button id="copyChatCodeBtn" class="copy-btn">Kopyala</button>
+        </p>
+      </div>
+    </div>
+    
+    <!-- Kod Giriş Bölümü -->
+    <div id="code-entry-section">
+      <div class="code-entry">
+        <input id="videoCodeInput" placeholder="Video Kodu" />
+        <button id="joinVideoRoomBtn">Video Odasına Katıl</button>
+      </div>
+      
+      <div class="code-entry">
+        <input id="chatCodeInput" placeholder="Chat Kodu" />
+        <button id="joinChatRoomBtn">Chat Odasına Katıl</button>
       </div>
     </div>
 
@@ -59,7 +75,7 @@
     <div id="video-chat-container" class="hidden">
       <div class="video-header">
         <h3>Video Görüşmesi</h3>
-        <button id="collapseVideoChat" class="back-button">Gizle</button>
+        <button id="closeVideoChat" class="close-button">Kapat</button>
       </div>
       <div class="videos">
         <video id="localVideo" autoplay muted playsinline></video>
@@ -70,14 +86,19 @@
         <button id="hangupButton" disabled>Sonlandır</button>
       </div>
       <div id="roomInfo">
-        <p>Oda ID: <span id="roomIdDisplay">---</span></p>
+        <p>Oda Kodu: <span id="currentVideoCode">---</span></p>
         <p>Durum: <span id="videoStatus">Başlamak için kamerayı başlat</span></p>
       </div>
     </div>
     
-    <!-- Chat Ekranı -->
-    <div id="chat-screen">
-      <h3>Mesajlar</h3>
+    <!-- Chat Container (Başlangıçta Gizli) -->
+    <div id="chat-container" class="hidden">
+      <div class="chat-header">
+        <h3>Chat Odası</h3>
+        <button id="closeChatRoom" class="close-button">Kapat</button>
+      </div>
+      <p id="chatRoomInfo">Oda Kodu: <span id="currentChatCode">---</span></p>
+      
       <!-- Mesajları Gösteren Alan -->
       <div id="messages-container"></div>
 
