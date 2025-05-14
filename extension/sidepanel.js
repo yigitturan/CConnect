@@ -775,8 +775,10 @@ document.addEventListener("DOMContentLoaded", () => {
         audio: true
       });
       
-      // Yerel videoyu göster
+      // Yerel videoyu göster ve aynalama uygula
       localVideo.srcObject = localStream;
+      localVideo.style.transform = "scaleX(-1)";
+
       hangupButton.disabled = false;
       
       // Kamera ve mikrofon durumunu güncelle
@@ -867,11 +869,43 @@ function createPeerConnection() {
   };
   
   // Yerel izleri peer bağlantısına ekle
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
+ // Yerel izleri peer bağlantısına ekle
+if (localStream) {
+  localStream.getTracks().forEach(track => {
       console.log("Yerel track peer bağlantısına ekleniyor:", track);
-      pc.addTrack(track, localStream);
-    });
+      const transformedStream = new MediaStream();
+      const videoTrack = track.clone();
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      videoTrack.addEventListener("ended", () => {
+          canvas.remove();
+      });
+
+      const videoElement = document.createElement("video");
+      videoElement.srcObject = new MediaStream([videoTrack]);
+      videoElement.play();
+
+      videoElement.addEventListener("play", () => {
+          canvas.width = videoElement.videoWidth;
+          canvas.height = videoElement.videoHeight;
+
+          function drawFrame() {
+              context.save();
+              context.scale(-1, 1);  // Mirror the video
+              context.translate(-canvas.width, 0); // Flip horizontally
+              context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+              context.restore();
+              requestAnimationFrame(drawFrame);
+          }
+
+          drawFrame();
+      });
+
+      const mirroredTrack = canvas.captureStream().getVideoTracks()[0];
+      transformedStream.addTrack(mirroredTrack);
+      pc.addTrack(mirroredTrack, transformedStream);
+  });
   } else {
     console.warn("Peer bağlantısı oluştururken yerel akış mevcut değil");
   }
