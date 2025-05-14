@@ -64,6 +64,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoCodeInput = document.getElementById("videoCodeInput");
   const chatCodeInput = document.getElementById("chatCodeInput");
   const joinVideoRoomBtn = document.getElementById("joinVideoRoomBtn");
+  if (joinVideoRoomBtn) {
+    const originalJoinHandler = joinVideoRoomBtn.onclick;
+    joinVideoRoomBtn.onclick = null;
+    
+    joinVideoRoomBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      
+      const code = document.getElementById('videoCodeInput')?.value.trim();
+      if (!code) {
+        alert("Lütfen bir video kodu girin.");
+        return;
+      }
+      
+      if (typeof originalJoinHandler === 'function') {
+        originalJoinHandler.call(joinVideoRoomBtn, event);
+      }
+    });
+  }
+  
   const joinChatRoomBtn = document.getElementById("joinChatRoomBtn");
   const currentVideoCode = document.getElementById("currentVideoCode");
   const currentChatCode = document.getElementById("currentChatCode");
@@ -648,6 +667,36 @@ document.addEventListener("DOMContentLoaded", () => {
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
     const startButton = document.getElementById('startButton');
+    if (startButton) {
+      // Mevcut tıklama olayını koru
+      const originalClickHandler = startButton.onclick;
+      startButton.onclick = null;
+      
+      startButton.addEventListener('click', async () => {
+        try {
+          // Kamera ve mikrofon izin durumlarını kontrol et
+          const cameraPermission = await navigator.permissions.query({ name: 'camera' });
+          const microphonePermission = await navigator.permissions.query({ name: 'microphone' });
+      
+          // Eğer izinler reddedilmişse ayarlar sayfasını aç
+          if (cameraPermission.state === 'denied' || microphonePermission.state === 'denied') {
+            console.warn('Kamera veya mikrofon izni reddedildi.');
+            chrome.tabs.create({ 
+              url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Fkliekihdnkkhdccgdafgdikhdoigbbam" 
+            });
+            return;
+          }
+      
+          // Eğer izin verilmişse görüşmeyi başlat
+          startCall();
+      
+        } catch (error) {
+          console.error("İzin kontrolü sırasında hata oluştu:", error);
+        }
+      });
+      
+    }
+
     const hangupButton = document.getElementById('hangupButton');
     const cameraToggle = document.getElementById('cameraToggle');
     const micToggle = document.getElementById('micToggle');
@@ -760,50 +809,66 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStatus('Mikrofon kapatıldı');
     }
   }
-  
+
+
   // Görüşmeyi başlatma fonksiyonu
-  async function startCall() {
+async function startCall() {
+  try {
+    updateStatus('Görüşme başlatılıyor...');
+    
+    // Butonları devre dışı bırak
+    startButton.disabled = true;
+    
     try {
-      updateStatus('Kamera başlatılıyor...');
-      
-      // Butonları devre dışı bırak
-      startButton.disabled = true;
-      
-      // Medya izinlerini iste
+      // Kamera ve mikrofon izin durumlarını kontrol et
+      const cameraPermission = await navigator.permissions.query({ name: 'camera' });
+      const microphonePermission = await navigator.permissions.query({ name: 'microphone' });
+
+      // Eğer izinler reddedilmişse ayarlar sayfasını aç
+      if (cameraPermission.state === 'denied' || microphonePermission.state === 'denied') {
+        console.warn('Kamera veya mikrofon izni reddedildi.');
+        chrome.tabs.create({ 
+          url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Fkliekihdnkkhdccgdafgdikhdoigbbam"
+        });
+        startButton.disabled = false;
+        return;
+      }
+
+      // Medya izinlerini doğrudan iste
       localStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
       
+      updateStatus('Kamera başlatıldı. Görüşme bağlanıyor...');
+      
       // Yerel videoyu göster ve aynalama uygula
+      const localVideo = document.getElementById('localVideo');
       localVideo.srcObject = localStream;
       localVideo.style.transform = "scaleX(-1)";
-
+      
       hangupButton.disabled = false;
       
-      // Kamera ve mikrofon durumunu güncelle
       isCameraOn = true;
       isMicOn = true;
       updateMediaUI();
+
+    } catch (mediaError) {
+      console.error('Medya erişim hatası:', mediaError);
       
-      updateStatus('Kamera başlatıldı. Odaya bağlanılıyor...');
-      
-      if (roomId) {
-        // Oda referansını oluştur
-        roomRef = database.ref('rooms/' + roomId);
+      if (mediaError.name === 'NotAllowedError' || mediaError.name === 'SecurityError') {
+        updateStatus('Kamera veya mikrofon izni reddedildi. İzin ayarlarını kontrol edin.');
         
-        // Odanın durumunu kontrol et
-        const roomSnapshot = await roomRef.once('value');
-        
-        if (!roomSnapshot.exists() || !roomSnapshot.val().offer) {
-          // Oda yoksa veya oda var ama offer yoksa, oda oluştur
-          await createRoom();
-        } else {
-          // Oda varsa ve offer varsa, odaya katıl
-        await joinRoom();
+        chrome.tabs.create({ 
+          url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Fkliekihdnkkhdccgdafgdikhdoigbbam" 
+        });
+      } else if (mediaError.name === 'NotFoundError') {
+        updateStatus('Kamera veya mikrofon bulunamadı.');
+      } else {
+        updateStatus('Kamera ve mikrofon erişimi sağlanamadı: ' + mediaError.message);
       }
-    } else {
-      updateStatus('Oda ID bulunamadı, görüşme başlatılamıyor.');
+
+      startButton.disabled = false;
     }
   } catch (error) {
     console.error('Error starting call:', error);
@@ -811,6 +876,8 @@ document.addEventListener("DOMContentLoaded", () => {
     startButton.disabled = false;
   }
 }
+  
+
 
 // Peer bağlantısı oluşturma
 function createPeerConnection() {
