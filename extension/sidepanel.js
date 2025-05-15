@@ -1054,78 +1054,225 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Fix for video sync functionality
+// Otomatik senkronizasyon özelliği eklenmiş Video Sync fonksiyonu
+// Sürekli ve gerçek zamanlı video senkronizasyon özelliği
 function initVideoSyncFeatures(roomId) {
-  console.log("[Sync] Initializing video synchronization features - Room ID:", roomId);
+  console.log("[Sync] Video senkronizasyon özellikleri başlatılıyor - Oda ID:", roomId);
   
-  // HTML elements
+  // HTML elemanları
   const syncVideoBtn = document.getElementById('syncVideoBtn');
   const syncStatus = document.getElementById('syncStatus');
   const currentVideoTime = document.getElementById('currentVideoTime');
   const remoteVideoTime = document.getElementById('remoteVideoTime');
   
-  // Create a better sync info area
+  // Senkronizasyon modu seçimi için radio butonları
+  const syncModeSelector = document.createElement('div');
+  syncModeSelector.className = 'sync-mode-selector';
+  syncModeSelector.innerHTML = `
+    <div class="sync-mode-title">Senkronizasyon Modu:</div>
+    
+    <div class="sync-mode-option">
+      <input type="radio" id="syncModeManual" name="syncMode" value="manual">
+      <label for="syncModeManual">Manuel (Buton ile)</label>
+    </div>
+    
+    <div class="sync-mode-option">
+      <input type="radio" id="syncModeAuto" name="syncMode" value="auto" checked>
+      <label for="syncModeAuto">Otomatik (Sürekli)</label>
+    </div>
+    
+    <div class="sync-tolerance">
+      <label for="syncToleranceRange">Senkronizasyon Hassasiyeti: <span id="toleranceValue">3</span> saniye</label>
+      <input type="range" id="syncToleranceRange" min="1" max="10" value="3">
+    </div>
+    
+    <style>
+      .sync-mode-selector {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .sync-mode-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+      .sync-mode-option {
+        margin: 5px 0;
+        display: flex;
+        align-items: center;
+      }
+      .sync-mode-option input {
+        margin-right: 8px;
+      }
+      .sync-tolerance {
+        margin-top: 10px;
+        font-size: 0.9em;
+      }
+      #syncToleranceRange {
+        width: 100%;
+        margin-top: 5px;
+      }
+    </style>
+  `;
+  
+  // Senkronizasyon bilgisi alanını oluştur
   const syncInfoDiv = document.createElement('div');
   syncInfoDiv.className = 'video-info';
-  syncInfoDiv.innerHTML = '<p>Video in active tab will be synchronized</p>';
+  syncInfoDiv.innerHTML = '<p>Aktif sekmedeki video senkronize edilecek</p>';
   
-  // Add info area to sync section
+  // Durum göstergesi (senkronizasyon durumunu gösterir)
+  const syncIndicator = document.createElement('div');
+  syncIndicator.className = 'sync-indicator';
+  syncIndicator.innerHTML = `
+    <div class="indicator-light"></div>
+    <div class="indicator-label">Senkronizasyon Durumu: <span id="syncStatusLabel">Bekleniyor</span></div>
+    <style>
+      .sync-indicator {
+        display: flex;
+        align-items: center;
+        margin: 10px 0;
+        font-size: 0.9em;
+      }
+      .indicator-light {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+        background-color: #777; /* default - gray */
+      }
+      .indicator-light.synced {
+        background-color: #4CAF50; /* green */
+        box-shadow: 0 0 5px #4CAF50;
+      }
+      .indicator-light.out-of-sync {
+        background-color: #FFC107; /* yellow */
+        box-shadow: 0 0 5px #FFC107;
+      }
+      .indicator-light.error {
+        background-color: #F44336; /* red */
+        box-shadow: 0 0 5px #F44336;
+      }
+    </style>
+  `;
+  
+  // Senkronizasyon bölümüne kontrolleri ve bilgi alanını ekle
   const syncSection = document.getElementById('video-sync-section');
   if (syncSection) {
+    syncSection.appendChild(syncModeSelector);
+    syncSection.appendChild(syncIndicator);
     syncSection.appendChild(syncInfoDiv);
   } else {
-    console.error("[Sync] Could not find video-sync-section element");
-    // Create the section if it doesn't exist
+    console.error("[Sync] video-sync-section elementi bulunamadı");
+    // Bölüm yoksa oluştur
     const newSyncSection = document.createElement('div');
     newSyncSection.id = 'video-sync-section';
     document.getElementById('videoContainer').appendChild(newSyncSection);
+    newSyncSection.appendChild(syncModeSelector);
+    newSyncSection.appendChild(syncIndicator);
     newSyncSection.appendChild(syncInfoDiv);
   }
   
-  // Firebase reference for sync data
+  // Senkronizasyon modlarını ve UI elemanlarını ayarla
+  const syncModeManual = document.getElementById('syncModeManual');
+  const syncModeAuto = document.getElementById('syncModeAuto');
+  const syncToleranceRange = document.getElementById('syncToleranceRange');
+  const toleranceValue = document.getElementById('toleranceValue');
+  const syncStatusLabel = document.getElementById('syncStatusLabel');
+  const indicatorLight = document.querySelector('.indicator-light');
+  
+  // Senkronizasyon değişkenlerini tanımla
+  let syncMode = 'auto'; // Varsayılan olarak otomatik mod
+  let syncTolerance = 3; // Varsayılan olarak 3 saniye tolerans
+  let lastSentTime = 0; // Son gönderilen zaman
+  let lastReceivedTime = 0; // Son alınan zaman
+  let localVideoInfo = null; // Yerel video bilgisi
+  let remoteVideoInfo = null; // Uzak video bilgisi
+  let syncInterval = null; // Sürekli senkronizasyon için interval
+  let lastSyncAttempt = 0; // Son senkronizasyon denemesi zamanı
+  
+  // Sürekli senkronizasyon için son kontrol zamanları
+  let lastLocalCheck = 0;
+  let lastRemoteCheck = 0;
+  
+  // Firebase referansı
   const syncRef = firebase.database().ref('videoSync/' + roomId);
   
-  // Add debug info button
-  const debugBtn = document.createElement('button');
-  debugBtn.textContent = 'Debug Info';
-  debugBtn.className = 'debug-btn';
-  debugBtn.style.marginTop = '8px';
-  debugBtn.style.fontSize = '10px';
-  debugBtn.style.backgroundColor = '#333';
-  debugBtn.style.padding = '4px 8px';
-  debugBtn.style.display = 'block';
+  // İşlem durumunu takip et
+  let isProcessingSync = false;
+  let isSeeking = false; // Kullanıcı manuel olarak videoda geziniyor mu
   
-  // Add debug button to sync section
-  syncSection.appendChild(debugBtn);
-  
-  // Debug info handler
-  debugBtn.addEventListener('click', async () => {
-    try {
-      syncStatus.textContent = "Getting debug info...";
-      
-      // Check content script status
-      chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
-        console.log("[Debug] Video info response:", response);
-        
-        let debugInfo = "Debug Info:\n";
-        debugInfo += `Success: ${response?.success ? "Yes" : "No"}\n`;
-        debugInfo += `Tab URL: ${response?.videoUrl || "Unknown"}\n`;
-        debugInfo += `Video detected: ${response?.success ? "Yes" : "No"}\n`;
-        debugInfo += `Video current time: ${response?.currentTime || "Unknown"}\n`;
-        debugInfo += `Video duration: ${response?.duration || "Unknown"}\n`;
-        debugInfo += `Video paused: ${response?.paused !== undefined ? response.paused : "Unknown"}\n`;
-        debugInfo += `Player type: ${response?.playerType || "Unknown"}\n`;
-        
-        alert(debugInfo);
-        syncStatus.textContent = "Debug info displayed";
-      });
-    } catch (error) {
-      console.error("[Debug] Error:", error);
-      syncStatus.textContent = "Debug error: " + error.message;
+  // Senkronizasyon modu değişikliği
+  syncModeManual.addEventListener('change', () => {
+    if (syncModeManual.checked) {
+      syncMode = 'manual';
+      stopAutomaticSync();
+      updateSyncStatus("Manuel mod aktif", "waiting");
     }
   });
   
-  // Loading indicator for better UX
-  const createLoadingIndicator = () => {
+  syncModeAuto.addEventListener('change', () => {
+    if (syncModeAuto.checked) {
+      syncMode = 'auto';
+      startAutomaticSync();
+      updateSyncStatus("Otomatik senkronizasyon başlatılıyor...", "waiting");
+    }
+  });
+  
+  // Tolerans değeri değişikliği
+  syncToleranceRange.addEventListener('input', () => {
+    syncTolerance = parseInt(syncToleranceRange.value);
+    toleranceValue.textContent = syncTolerance;
+    console.log(`[Sync] Senkronizasyon toleransı: ${syncTolerance} saniye`);
+  });
+  
+  // Süre formatını biçimlendir (MM:SS)
+  function formatTime(timeInSeconds) {
+    if (isNaN(timeInSeconds) || timeInSeconds === undefined) return "00:00";
+    
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  
+  // UI senkronizasyon durumunu güncelle
+  function updateSyncStatus(message, state = "waiting") {
+    syncStatusLabel.textContent = message;
+    
+    // Gösterge ışığının durumunu ayarla
+    indicatorLight.className = "indicator-light";
+    if (state === "synced") {
+      indicatorLight.classList.add("synced");
+    } else if (state === "out-of-sync") {
+      indicatorLight.classList.add("out-of-sync");
+    } else if (state === "error") {
+      indicatorLight.classList.add("error");
+    }
+    
+    // Durum mesajını güncelle
+    syncStatus.textContent = message;
+    
+    if (state === "synced") {
+      syncStatus.className = 'status-success';
+    } else if (state === "out-of-sync") {
+      syncStatus.className = 'status-warning';
+    } else if (state === "error") {
+      syncStatus.className = 'status-error';
+    } else {
+      syncStatus.className = 'status-info';
+    }
+  }
+  
+  // Metin uzunluğunu sınırla
+  function limitText(text, maxLength) {
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  }
+  
+  // Yükleniyor göstergesi oluştur
+  function createLoadingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'loading-spinner';
     indicator.innerHTML = `
@@ -1150,127 +1297,242 @@ function initVideoSyncFeatures(roomId) {
       </style>
     `;
     return indicator;
-  };
+  }
   
-  // Add status tracking to prevent multiple operations
-  let isProcessingSync = false;
-  
-  // Get initial sync data if available
-  syncRef.once('value', (snapshot) => {
-    const syncData = snapshot.val();
-    if (syncData) {
-      remoteVideoTime.textContent = formatTime(syncData.currentTime);
-      
-      // Show info if someone recently synced
-      if (syncData.sender !== currentUserNickname && (Date.now() - syncData.timestamp) < 10000) {
-        syncStatus.textContent = `${syncData.sender} last synchronized`;
-        syncStatus.className = 'status-info';
-        
-        // Update info div with remote video details
-        syncInfoDiv.innerHTML = `
-          <p><strong>From ${syncData.sender}:</strong></p>
-          <p><strong>Page:</strong> ${limitText(syncData.pageTitle || "Video", 30)}</p>
-          <p><strong>Time:</strong> ${formatTime(syncData.currentTime)} / ${formatTime(syncData.duration)}</p>
-          <button id="applySyncBtn" class="sync-btn">Sync to this time</button>
-        `;
-        
-        // Add event listener to the sync button
-        const applySyncBtn = document.getElementById('applySyncBtn');
-        if (applySyncBtn) {
-          applySyncBtn.addEventListener('click', () => {
-            applySyncToLocal(syncData.currentTime);
-          });
+  // Yerel video bilgisini al
+  async function checkLocalVideo() {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("[Sync] Video bilgisi alma hatası:", chrome.runtime.lastError);
+          resolve(null);
+          return;
         }
-      }
-    }
-  });
+        
+        if (!response || !response.success) {
+          resolve(null);
+          return;
+        }
+        
+        resolve({
+          currentTime: response.currentTime,
+          duration: response.duration,
+          paused: response.paused,
+          videoUrl: response.videoUrl,
+          pageTitle: response.pageTitle,
+          playerType: response.playerType,
+          timestamp: Date.now()
+        });
+      });
+    });
+  }
   
-  // Sync button click handler
+  // Video süresini ayarla
+  async function setVideoTime(timeToSet) {
+    if (isSeeking) {
+      console.log("[Sync] Kullanıcı videoda geziniyor, senkronizasyon atlanıyor");
+      return false;
+    }
+    
+    return new Promise((resolve, reject) => {
+      isSeeking = true;
+      
+      chrome.runtime.sendMessage({
+        action: "setVideoTime",
+        currentTime: timeToSet
+      }, (response) => {
+        isSeeking = false;
+        
+        if (chrome.runtime.lastError) {
+          console.error("[Sync] Video süresini ayarlama hatası:", chrome.runtime.lastError);
+          resolve(false);
+          return;
+        }
+        
+        if (!response || !response.success) {
+          resolve(false);
+          return;
+        }
+        
+        resolve(true);
+      });
+    });
+  }
+  
+  // Senkronizasyon verisini Firebase'e gönder
+  async function sendSyncData(videoInfo) {
+    if (!videoInfo) return false;
+    
+    const syncData = {
+      sender: currentUserNickname,
+      currentTime: videoInfo.currentTime,
+      duration: videoInfo.duration,
+      paused: videoInfo.paused,
+      url: videoInfo.videoUrl,
+      pageTitle: videoInfo.pageTitle,
+      playerType: videoInfo.playerType,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+    
+    try {
+      await syncRef.update(syncData);
+      lastSentTime = Date.now();
+      return true;
+    } catch (error) {
+      console.error("[Sync] Senkronizasyon veri gönderme hatası:", error);
+      return false;
+    }
+  }
+  
+  // İki video arasındaki süre farkını kontrol et
+  function checkTimeDifference(localTime, remoteTime) {
+    if (localTime === null || remoteTime === null) return null;
+    
+    const difference = Math.abs(localTime - remoteTime);
+    return difference;
+  }
+  
+  // Otomatik senkronizasyonu başlat
+  function startAutomaticSync() {
+    if (syncInterval) {
+      clearInterval(syncInterval);
+    }
+    
+    // 2 saniyede bir senkronizasyon kontrolü yap
+    syncInterval = setInterval(async () => {
+      if (isProcessingSync) return;
+      
+      try {
+        isProcessingSync = true;
+        
+        // Yerel video bilgisini al (her seferinde)
+        const newLocalInfo = await checkLocalVideo();
+        
+        // Eğer yeni video bilgisi alınabildiyse, güncelle
+        if (newLocalInfo) {
+          // Video bilgisini güncelle
+          localVideoInfo = newLocalInfo;
+          
+          // UI'ı güncelle
+          currentVideoTime.textContent = formatTime(localVideoInfo.currentTime);
+          
+          // 5 saniyede bir yerel durumu gönder (spam önleme)
+          if (Date.now() - lastSentTime > 5000) {
+            sendSyncData(localVideoInfo);
+          }
+          
+          // Uzak video bilgisi varsa kontrolü yap
+          if (remoteVideoInfo) {
+            const timeDifference = checkTimeDifference(
+              localVideoInfo.currentTime, 
+              remoteVideoInfo.currentTime
+            );
+            
+            if (timeDifference !== null) {
+              // Tolerans dışında ise senkronize et
+              if (timeDifference > syncTolerance) {
+                // Son senkronizasyon denemesinden en az 3 saniye geçtiyse
+                if (Date.now() - lastSyncAttempt > 3000) {
+                  console.log(`[Sync] Süre farkı: ${timeDifference.toFixed(2)}s - Tolerans dışında, senkronize ediliyor...`);
+                  updateSyncStatus("Senkronize ediliyor...", "out-of-sync");
+                  
+                  // Video süresini ayarla
+                  const success = await setVideoTime(remoteVideoInfo.currentTime);
+                  lastSyncAttempt = Date.now();
+                  
+                  if (success) {
+                    updateSyncStatus("Senkronize edildi", "synced");
+                  } else {
+                    updateSyncStatus("Senkronizasyon başarısız", "error");
+                  }
+                }
+              } else {
+                updateSyncStatus("Senkronize", "synced");
+              }
+            }
+          }
+        } else {
+          // Video bulunamadı/ulaşılamadı
+          updateSyncStatus("Video bulunamıyor", "error");
+        }
+        
+        isProcessingSync = false;
+      } catch (error) {
+        console.error("[Sync] Otomatik senkronizasyon hatası:", error);
+        updateSyncStatus("Senkronizasyon hatası", "error");
+        isProcessingSync = false;
+      }
+    }, 2000);
+  }
+  
+  // Otomatik senkronizasyonu durdur
+  function stopAutomaticSync() {
+    if (syncInterval) {
+      clearInterval(syncInterval);
+      syncInterval = null;
+    }
+  }
+  
+  // Manuel senkronizasyon butonu tıklama işleyicisi
   syncVideoBtn.addEventListener('click', async () => {
     if (isProcessingSync) return;
     isProcessingSync = true;
     
     try {
-      // Update UI to show we're working
+      // Arayüzü güncelle
       syncVideoBtn.disabled = true;
-      syncStatus.textContent = "Looking for active video...";
-      syncStatus.className = 'status-syncing sync-animation';
+      updateSyncStatus("Aktif video aranıyor...", "waiting");
       
-      // Add loading indicator
+      // Yükleniyor göstergesi ekle
       const loadingIndicator = createLoadingIndicator();
       syncVideoBtn.parentNode.insertBefore(loadingIndicator, syncVideoBtn.nextSibling);
       
-      // Send message to get video info
-      chrome.runtime.sendMessage({ action: "getVideoInfo" }, async (response) => {
-        console.log("[Sync] Video info response:", response);
-        
-        // Remove loading indicator
-        if (loadingIndicator && loadingIndicator.parentNode) {
-          loadingIndicator.parentNode.removeChild(loadingIndicator);
-        }
-        
-        if (!response || !response.success) {
-          syncStatus.textContent = "No active video found in current tab!";
-          syncStatus.className = 'status-error';
-          syncVideoBtn.disabled = false;
-          isProcessingSync = false;
-          return;
-        }
-        
-        const videoTime = response.currentTime;
-        const videoDuration = response.duration;
-        const videoUrl = response.videoUrl;
-        const pageTitle = response.pageTitle || "Video";
-        const playerType = response.playerType || "generic";
-        
-        // Display current time
-        currentVideoTime.textContent = formatTime(videoTime);
-        
-        // Update info area
-        syncInfoDiv.innerHTML = `
-          <p><strong>Found Video:</strong></p>
-          <p><strong>Page:</strong> ${limitText(pageTitle, 30)}</p>
-          <p><strong>URL:</strong> ${limitText(videoUrl, 40)}</p>
-          <p><strong>Current Time:</strong> ${formatTime(videoTime)} / ${formatTime(videoDuration)}</p>
-          <p><strong>Player Type:</strong> ${playerType}</p>
-        `;
-        
-        // Create sync data
-        const syncData = {
-          sender: currentUserNickname,
-          currentTime: videoTime,
-          duration: videoDuration,
-          url: videoUrl,
-          pageTitle: pageTitle,
-          playerType: playerType,
-          timestamp: firebase.database.ServerValue.TIMESTAMP
-        };
-        
-        try {
-          // Send to Firebase
-          await syncRef.set(syncData);
-          syncStatus.textContent = "Synchronization sent successfully!";
-          syncStatus.className = 'status-success';
-          console.log("[Sync] Video time sent:", videoTime);
-        } catch (error) {
-          syncStatus.textContent = "Error sending sync data: " + error.message;
-          syncStatus.className = 'status-error';
-          console.error("[Sync] Error sending sync data:", error);
-        }
-        
+      // Yerel video bilgisini al
+      const videoInfo = await checkLocalVideo();
+      
+      // Yükleniyor göstergesini kaldır
+      if (loadingIndicator && loadingIndicator.parentNode) {
+        loadingIndicator.parentNode.removeChild(loadingIndicator);
+      }
+      
+      if (!videoInfo) {
+        updateSyncStatus("Mevcut sekmede aktif video bulunamadı!", "error");
         syncVideoBtn.disabled = false;
         isProcessingSync = false;
-      });
+        return;
+      }
+      
+      // Yerel bilgiyi güncelle
+      localVideoInfo = videoInfo;
+      currentVideoTime.textContent = formatTime(videoInfo.currentTime);
+      
+      // Bilgi alanını güncelle
+      syncInfoDiv.innerHTML = `
+        <p><strong>Video Bulundu:</strong></p>
+        <p><strong>Sayfa:</strong> ${limitText(videoInfo.pageTitle || "Video", 30)}</p>
+        <p><strong>Süre:</strong> ${formatTime(videoInfo.currentTime)} / ${formatTime(videoInfo.duration)}</p>
+        <p><strong>Durum:</strong> ${videoInfo.paused ? "Duraklatıldı" : "Oynatılıyor"}</p>
+      `;
+      
+      // Senkronizasyon verisini gönder
+      const success = await sendSyncData(videoInfo);
+      
+      if (success) {
+        updateSyncStatus("Senkronizasyon bilgisi gönderildi", "synced");
+      } else {
+        updateSyncStatus("Senkronizasyon bilgisi gönderilemedi", "error");
+      }
+      
+      syncVideoBtn.disabled = false;
+      isProcessingSync = false;
     } catch (error) {
-      // Handle any unexpected errors
-      syncStatus.textContent = "Error: " + error.message;
-      syncStatus.className = 'status-error';
-      console.error("[Sync] Sync error:", error);
+      console.error("[Sync] Manuel senkronizasyon hatası:", error);
+      updateSyncStatus("Senkronizasyon hatası: " + error.message, "error");
       
       syncVideoBtn.disabled = false;
       isProcessingSync = false;
       
-      // Remove loading indicator if it exists
+      // Yükleniyor göstergesi varsa kaldır
       const loadingIndicator = document.querySelector('.loading-spinner');
       if (loadingIndicator && loadingIndicator.parentNode) {
         loadingIndicator.parentNode.removeChild(loadingIndicator);
@@ -1278,120 +1540,153 @@ function initVideoSyncFeatures(roomId) {
     }
   });
   
-  // Function to apply a sync to local video
-  async function applySyncToLocal(timeToSet) {
-    if (isProcessingSync) return;
-    isProcessingSync = true;
-    
-    try {
-      syncStatus.textContent = "Applying synchronization...";
-      syncStatus.className = 'status-syncing sync-animation';
-      
-      // Add loading indicator
-      const loadingIndicator = createLoadingIndicator();
-      syncStatus.parentNode.insertBefore(loadingIndicator, syncStatus.nextSibling);
-      
-      // Send message to set video time
-      chrome.runtime.sendMessage({
-        action: "setVideoTime",
-        currentTime: timeToSet
-      }, (response) => {
-        console.log("[Sync] Set video time response:", response);
-        
-        // Remove loading indicator
-        if (loadingIndicator && loadingIndicator.parentNode) {
-          loadingIndicator.parentNode.removeChild(loadingIndicator);
-        }
-        
-        if (response && response.success) {
-          syncStatus.textContent = "Video synchronized successfully!";
-          syncStatus.className = 'status-success';
-          currentVideoTime.textContent = formatTime(response.newTime || timeToSet);
-          
-          // Add a playing/paused indicator
-          if (response.playing !== undefined) {
-            const playState = response.playing ? "playing" : "paused";
-            syncStatus.textContent += ` (Video is ${playState})`;
-          }
-        } else {
-          syncStatus.textContent = "Failed to synchronize: " + (response?.message || "Unknown error");
-          syncStatus.className = 'status-error';
-        }
-        
-        isProcessingSync = false;
-      });
-    } catch (error) {
-      syncStatus.textContent = "Sync error: " + error.message;
-      syncStatus.className = 'status-error';
-      console.error("[Sync] Apply sync error:", error);
-      isProcessingSync = false;
-      
-      // Remove loading indicator if it exists
-      const loadingIndicator = document.querySelector('.loading-spinner');
-      if (loadingIndicator && loadingIndicator.parentNode) {
-        loadingIndicator.parentNode.removeChild(loadingIndicator);
-      }
-    }
-  }
-  
-  // Listen for remote sync updates
+  // Uzak senkronizasyon verilerini dinle
   syncRef.on('value', (snapshot) => {
     const syncData = snapshot.val();
     if (!syncData) return;
     
-    // Ignore our own sync events
-    if (syncData.sender === currentUserNickname) {
-      return;
+    // Kendi gönderdiğimiz veriyi işleme
+    if (syncData.sender === currentUserNickname) return;
+    
+    console.log("[Sync] Uzak senkronizasyon verisi alındı:", syncData);
+    
+    // Uzak video bilgisini güncelle
+    remoteVideoInfo = {
+      currentTime: syncData.currentTime,
+      duration: syncData.duration,
+      paused: syncData.paused,
+      videoUrl: syncData.url,
+      pageTitle: syncData.pageTitle,
+      playerType: syncData.playerType,
+      timestamp: Date.now()
+    };
+    
+    // Uzak süreyi göster
+    remoteVideoTime.textContent = formatTime(remoteVideoInfo.currentTime);
+    
+    // Bilgi alanını güncelle (manuel modda veya otomatik modun başlangıcında)
+    if (syncMode === 'manual' || !localVideoInfo) {
+      // Manuel modda bilgi alanını güncelle
+      syncInfoDiv.innerHTML = `
+        <p><strong>${syncData.sender} tarafından:</strong></p>
+        <p><strong>Sayfa:</strong> ${limitText(syncData.pageTitle || "Video", 30)}</p>
+        <p><strong>Süre:</strong> ${formatTime(syncData.currentTime)} / ${formatTime(syncData.duration)}</p>
+        <p><strong>Durum:</strong> ${syncData.paused ? "Duraklatıldı" : "Oynatılıyor"}</p>
+      `;
+      
+      if (syncMode === 'manual') {
+        // Manuel modda senkronizasyon butonu ekle
+        syncInfoDiv.innerHTML += `<button id="applySyncBtn" class="sync-btn">Bu süreye senkronize et</button>`;
+        
+        // Senkronizasyon butonuna olay dinleyicisi ekle
+        const applySyncBtn = document.getElementById('applySyncBtn');
+        if (applySyncBtn) {
+          applySyncBtn.addEventListener('click', async () => {
+            updateSyncStatus("Senkronize ediliyor...", "waiting");
+            const success = await setVideoTime(remoteVideoInfo.currentTime);
+            
+            if (success) {
+              currentVideoTime.textContent = formatTime(remoteVideoInfo.currentTime);
+              updateSyncStatus("Manuel senkronizasyon başarılı", "synced");
+            } else {
+              updateSyncStatus("Senkronizasyon başarısız", "error");
+            }
+          });
+        }
+      }
     }
     
-    // Update the remote time display
-    remoteVideoTime.textContent = formatTime(syncData.currentTime);
-    
-    // Show notification
-    syncStatus.textContent = `${syncData.sender} sent a new timestamp`;
-    syncStatus.className = 'status-info';
-    
-    // Update info with sync details and offer to apply
-    syncInfoDiv.innerHTML = `
-      <p><strong>From ${syncData.sender}:</strong></p>
-      <p><strong>Page:</strong> ${limitText(syncData.pageTitle || "Video", 30)}</p>
-      <p><strong>Time:</strong> ${formatTime(syncData.currentTime)} / ${formatTime(syncData.duration)}</p>
-      <button id="newSyncBtn" class="sync-btn">Sync to this time</button>
-    `;
-    
-    // Add event listener to sync button
-    const newSyncBtn = document.getElementById('newSyncBtn');
-    if (newSyncBtn) {
-      newSyncBtn.addEventListener('click', () => {
-        applySyncToLocal(syncData.currentTime);
-      });
+    // Otomatik modda, anında senkronize et (son denemeden 3 saniye geçtiyse)
+    if (syncMode === 'auto' && localVideoInfo && Date.now() - lastSyncAttempt > 3000) {
+      const timeDifference = checkTimeDifference(
+        localVideoInfo.currentTime, 
+        remoteVideoInfo.currentTime
+      );
+      
+      if (timeDifference !== null && timeDifference > syncTolerance) {
+        console.log(`[Sync] Uzak güncellemeden sonra süre farkı: ${timeDifference.toFixed(2)}s - senkronize ediliyor...`);
+        
+        // Süreyi ayarla
+        setVideoTime(remoteVideoInfo.currentTime).then(success => {
+          lastSyncAttempt = Date.now();
+          
+          if (success) {
+            currentVideoTime.textContent = formatTime(remoteVideoInfo.currentTime);
+            updateSyncStatus("Otomatik senkronizasyon başarılı", "synced");
+          } else {
+            updateSyncStatus("Otomatik senkronizasyon başarısız", "error");
+          }
+        });
+      }
     }
   });
   
-  // Format time to MM:SS
-  function formatTime(timeInSeconds) {
-    if (isNaN(timeInSeconds) || timeInSeconds === undefined) return "00:00";
-    
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
-    
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  // Başlangıçta otomatik senkronizasyonu başlat
+  if (syncMode === 'auto') {
+    startAutomaticSync();
   }
   
-  // Limit text length
-  function limitText(text, maxLength) {
-    if (!text) return "";
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
-  }
+  // Debug butonu
+  const debugBtn = document.createElement('button');
+  debugBtn.textContent = 'Debug Bilgisi';
+  debugBtn.className = 'debug-btn';
+  debugBtn.style.marginTop = '8px';
+  debugBtn.style.fontSize = '10px';
+  debugBtn.style.backgroundColor = '#333';
+  debugBtn.style.padding = '4px 8px';
+  debugBtn.style.display = 'block';
   
-  // Return cleanup function
+  // Debug butonunu ekle
+  syncSection.appendChild(debugBtn);
+  
+  // Debug butonu tıklama işleyicisi
+  debugBtn.addEventListener('click', async () => {
+    // Yerel ve uzak bilgileri göster
+    let debugInfo = "Debug Bilgisi:\n\n";
+    
+    debugInfo += "Senkronizasyon Modu: " + syncMode + "\n";
+    debugInfo += "Tolerans: " + syncTolerance + " saniye\n\n";
+    
+    if (localVideoInfo) {
+      debugInfo += "YEREL VİDEO:\n";
+      debugInfo += `Süre: ${formatTime(localVideoInfo.currentTime)} / ${formatTime(localVideoInfo.duration)}\n`;
+      debugInfo += `Durum: ${localVideoInfo.paused ? "Duraklatıldı" : "Oynatılıyor"}\n`;
+      debugInfo += `URL: ${localVideoInfo.videoUrl || "Bilinmiyor"}\n\n`;
+    } else {
+      debugInfo += "YEREL VİDEO: Bilgi yok\n\n";
+    }
+    
+    if (remoteVideoInfo) {
+      debugInfo += "UZAK VİDEO:\n";
+      debugInfo += `Süre: ${formatTime(remoteVideoInfo.currentTime)} / ${formatTime(remoteVideoInfo.duration)}\n`;
+      debugInfo += `Durum: ${remoteVideoInfo.paused ? "Duraklatıldı" : "Oynatılıyor"}\n`;
+      debugInfo += `URL: ${remoteVideoInfo.videoUrl || "Bilinmiyor"}\n\n`;
+    } else {
+      debugInfo += "UZAK VİDEO: Bilgi yok\n\n";
+    }
+    
+    if (localVideoInfo && remoteVideoInfo) {
+      const timeDiff = checkTimeDifference(localVideoInfo.currentTime, remoteVideoInfo.currentTime);
+      debugInfo += `SÜRE FARKI: ${timeDiff ? timeDiff.toFixed(2) : "?"} saniye\n`;
+      debugInfo += `SENKRONIZE MI: ${timeDiff && timeDiff <= syncTolerance ? "EVET" : "HAYIR"}\n\n`;
+    }
+    
+    // Son işlem zamanları
+    debugInfo += `Son yerel kontrol: ${lastLocalCheck ? new Date(lastLocalCheck).toLocaleTimeString() : "Yok"}\n`;
+    debugInfo += `Son uzak kontrol: ${lastRemoteCheck ? new Date(lastRemoteCheck).toLocaleTimeString() : "Yok"}\n`;
+    debugInfo += `Son senkronizasyon denemesi: ${lastSyncAttempt ? new Date(lastSyncAttempt).toLocaleTimeString() : "Yok"}\n`;
+    
+    alert(debugInfo);
+  });
+  
+  // Temizleme fonksiyonu
   return function cleanup() {
-    // Remove all listeners
+    stopAutomaticSync();
     syncRef.off();
-    console.log("[Sync] Video sync cleanup complete for room", roomId);
+    console.log("[Sync] Video senkronizasyon temizliği tamamlandı, oda:", roomId);
   };
 }
+
     // Görüşmeyi sonlandır
     function hangUp() {
       if (peerConnection) {
