@@ -1053,15 +1053,345 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    // Video senkronizasyon özelliklerini başlat
-    function initVideoSyncFeatures(roomId) {
-      // Video senkronizasyon özelliği kodlarını buraya ekleyin
-      // Bu fonksiyon, video senkronizasyonu için gerekli olan temizleme fonksiyonunu döndürmeli
-      return function() {
-        // Temizleme kodları
-      };
+    // Fix for video sync functionality
+function initVideoSyncFeatures(roomId) {
+  console.log("[Sync] Initializing video synchronization features - Room ID:", roomId);
+  
+  // HTML elements
+  const syncVideoBtn = document.getElementById('syncVideoBtn');
+  const syncStatus = document.getElementById('syncStatus');
+  const currentVideoTime = document.getElementById('currentVideoTime');
+  const remoteVideoTime = document.getElementById('remoteVideoTime');
+  
+  // Create a better sync info area
+  const syncInfoDiv = document.createElement('div');
+  syncInfoDiv.className = 'video-info';
+  syncInfoDiv.innerHTML = '<p>Video in active tab will be synchronized</p>';
+  
+  // Add info area to sync section
+  const syncSection = document.getElementById('video-sync-section');
+  if (syncSection) {
+    syncSection.appendChild(syncInfoDiv);
+  } else {
+    console.error("[Sync] Could not find video-sync-section element");
+    // Create the section if it doesn't exist
+    const newSyncSection = document.createElement('div');
+    newSyncSection.id = 'video-sync-section';
+    document.getElementById('videoContainer').appendChild(newSyncSection);
+    newSyncSection.appendChild(syncInfoDiv);
+  }
+  
+  // Firebase reference for sync data
+  const syncRef = firebase.database().ref('videoSync/' + roomId);
+  
+  // Add debug info button
+  const debugBtn = document.createElement('button');
+  debugBtn.textContent = 'Debug Info';
+  debugBtn.className = 'debug-btn';
+  debugBtn.style.marginTop = '8px';
+  debugBtn.style.fontSize = '10px';
+  debugBtn.style.backgroundColor = '#333';
+  debugBtn.style.padding = '4px 8px';
+  debugBtn.style.display = 'block';
+  
+  // Add debug button to sync section
+  syncSection.appendChild(debugBtn);
+  
+  // Debug info handler
+  debugBtn.addEventListener('click', async () => {
+    try {
+      syncStatus.textContent = "Getting debug info...";
+      
+      // Check content script status
+      chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
+        console.log("[Debug] Video info response:", response);
+        
+        let debugInfo = "Debug Info:\n";
+        debugInfo += `Success: ${response?.success ? "Yes" : "No"}\n`;
+        debugInfo += `Tab URL: ${response?.videoUrl || "Unknown"}\n`;
+        debugInfo += `Video detected: ${response?.success ? "Yes" : "No"}\n`;
+        debugInfo += `Video current time: ${response?.currentTime || "Unknown"}\n`;
+        debugInfo += `Video duration: ${response?.duration || "Unknown"}\n`;
+        debugInfo += `Video paused: ${response?.paused !== undefined ? response.paused : "Unknown"}\n`;
+        debugInfo += `Player type: ${response?.playerType || "Unknown"}\n`;
+        
+        alert(debugInfo);
+        syncStatus.textContent = "Debug info displayed";
+      });
+    } catch (error) {
+      console.error("[Debug] Error:", error);
+      syncStatus.textContent = "Debug error: " + error.message;
+    }
+  });
+  
+  // Loading indicator for better UX
+  const createLoadingIndicator = () => {
+    const indicator = document.createElement('div');
+    indicator.className = 'loading-spinner';
+    indicator.innerHTML = `
+      <div class="spinner"></div>
+      <style>
+        .loading-spinner {
+          display: flex;
+          justify-content: center;
+          margin: 10px 0;
+        }
+        .spinner {
+          width: 20px;
+          height: 20px;
+          border: 3px solid rgba(255,255,255,0.3);
+          border-radius: 50%;
+          border-top-color: #fff;
+          animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      </style>
+    `;
+    return indicator;
+  };
+  
+  // Add status tracking to prevent multiple operations
+  let isProcessingSync = false;
+  
+  // Get initial sync data if available
+  syncRef.once('value', (snapshot) => {
+    const syncData = snapshot.val();
+    if (syncData) {
+      remoteVideoTime.textContent = formatTime(syncData.currentTime);
+      
+      // Show info if someone recently synced
+      if (syncData.sender !== currentUserNickname && (Date.now() - syncData.timestamp) < 10000) {
+        syncStatus.textContent = `${syncData.sender} last synchronized`;
+        syncStatus.className = 'status-info';
+        
+        // Update info div with remote video details
+        syncInfoDiv.innerHTML = `
+          <p><strong>From ${syncData.sender}:</strong></p>
+          <p><strong>Page:</strong> ${limitText(syncData.pageTitle || "Video", 30)}</p>
+          <p><strong>Time:</strong> ${formatTime(syncData.currentTime)} / ${formatTime(syncData.duration)}</p>
+          <button id="applySyncBtn" class="sync-btn">Sync to this time</button>
+        `;
+        
+        // Add event listener to the sync button
+        const applySyncBtn = document.getElementById('applySyncBtn');
+        if (applySyncBtn) {
+          applySyncBtn.addEventListener('click', () => {
+            applySyncToLocal(syncData.currentTime);
+          });
+        }
+      }
+    }
+  });
+  
+  // Sync button click handler
+  syncVideoBtn.addEventListener('click', async () => {
+    if (isProcessingSync) return;
+    isProcessingSync = true;
+    
+    try {
+      // Update UI to show we're working
+      syncVideoBtn.disabled = true;
+      syncStatus.textContent = "Looking for active video...";
+      syncStatus.className = 'status-syncing sync-animation';
+      
+      // Add loading indicator
+      const loadingIndicator = createLoadingIndicator();
+      syncVideoBtn.parentNode.insertBefore(loadingIndicator, syncVideoBtn.nextSibling);
+      
+      // Send message to get video info
+      chrome.runtime.sendMessage({ action: "getVideoInfo" }, async (response) => {
+        console.log("[Sync] Video info response:", response);
+        
+        // Remove loading indicator
+        if (loadingIndicator && loadingIndicator.parentNode) {
+          loadingIndicator.parentNode.removeChild(loadingIndicator);
+        }
+        
+        if (!response || !response.success) {
+          syncStatus.textContent = "No active video found in current tab!";
+          syncStatus.className = 'status-error';
+          syncVideoBtn.disabled = false;
+          isProcessingSync = false;
+          return;
+        }
+        
+        const videoTime = response.currentTime;
+        const videoDuration = response.duration;
+        const videoUrl = response.videoUrl;
+        const pageTitle = response.pageTitle || "Video";
+        const playerType = response.playerType || "generic";
+        
+        // Display current time
+        currentVideoTime.textContent = formatTime(videoTime);
+        
+        // Update info area
+        syncInfoDiv.innerHTML = `
+          <p><strong>Found Video:</strong></p>
+          <p><strong>Page:</strong> ${limitText(pageTitle, 30)}</p>
+          <p><strong>URL:</strong> ${limitText(videoUrl, 40)}</p>
+          <p><strong>Current Time:</strong> ${formatTime(videoTime)} / ${formatTime(videoDuration)}</p>
+          <p><strong>Player Type:</strong> ${playerType}</p>
+        `;
+        
+        // Create sync data
+        const syncData = {
+          sender: currentUserNickname,
+          currentTime: videoTime,
+          duration: videoDuration,
+          url: videoUrl,
+          pageTitle: pageTitle,
+          playerType: playerType,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+        
+        try {
+          // Send to Firebase
+          await syncRef.set(syncData);
+          syncStatus.textContent = "Synchronization sent successfully!";
+          syncStatus.className = 'status-success';
+          console.log("[Sync] Video time sent:", videoTime);
+        } catch (error) {
+          syncStatus.textContent = "Error sending sync data: " + error.message;
+          syncStatus.className = 'status-error';
+          console.error("[Sync] Error sending sync data:", error);
+        }
+        
+        syncVideoBtn.disabled = false;
+        isProcessingSync = false;
+      });
+    } catch (error) {
+      // Handle any unexpected errors
+      syncStatus.textContent = "Error: " + error.message;
+      syncStatus.className = 'status-error';
+      console.error("[Sync] Sync error:", error);
+      
+      syncVideoBtn.disabled = false;
+      isProcessingSync = false;
+      
+      // Remove loading indicator if it exists
+      const loadingIndicator = document.querySelector('.loading-spinner');
+      if (loadingIndicator && loadingIndicator.parentNode) {
+        loadingIndicator.parentNode.removeChild(loadingIndicator);
+      }
+    }
+  });
+  
+  // Function to apply a sync to local video
+  async function applySyncToLocal(timeToSet) {
+    if (isProcessingSync) return;
+    isProcessingSync = true;
+    
+    try {
+      syncStatus.textContent = "Applying synchronization...";
+      syncStatus.className = 'status-syncing sync-animation';
+      
+      // Add loading indicator
+      const loadingIndicator = createLoadingIndicator();
+      syncStatus.parentNode.insertBefore(loadingIndicator, syncStatus.nextSibling);
+      
+      // Send message to set video time
+      chrome.runtime.sendMessage({
+        action: "setVideoTime",
+        currentTime: timeToSet
+      }, (response) => {
+        console.log("[Sync] Set video time response:", response);
+        
+        // Remove loading indicator
+        if (loadingIndicator && loadingIndicator.parentNode) {
+          loadingIndicator.parentNode.removeChild(loadingIndicator);
+        }
+        
+        if (response && response.success) {
+          syncStatus.textContent = "Video synchronized successfully!";
+          syncStatus.className = 'status-success';
+          currentVideoTime.textContent = formatTime(response.newTime || timeToSet);
+          
+          // Add a playing/paused indicator
+          if (response.playing !== undefined) {
+            const playState = response.playing ? "playing" : "paused";
+            syncStatus.textContent += ` (Video is ${playState})`;
+          }
+        } else {
+          syncStatus.textContent = "Failed to synchronize: " + (response?.message || "Unknown error");
+          syncStatus.className = 'status-error';
+        }
+        
+        isProcessingSync = false;
+      });
+    } catch (error) {
+      syncStatus.textContent = "Sync error: " + error.message;
+      syncStatus.className = 'status-error';
+      console.error("[Sync] Apply sync error:", error);
+      isProcessingSync = false;
+      
+      // Remove loading indicator if it exists
+      const loadingIndicator = document.querySelector('.loading-spinner');
+      if (loadingIndicator && loadingIndicator.parentNode) {
+        loadingIndicator.parentNode.removeChild(loadingIndicator);
+      }
+    }
+  }
+  
+  // Listen for remote sync updates
+  syncRef.on('value', (snapshot) => {
+    const syncData = snapshot.val();
+    if (!syncData) return;
+    
+    // Ignore our own sync events
+    if (syncData.sender === currentUserNickname) {
+      return;
     }
     
+    // Update the remote time display
+    remoteVideoTime.textContent = formatTime(syncData.currentTime);
+    
+    // Show notification
+    syncStatus.textContent = `${syncData.sender} sent a new timestamp`;
+    syncStatus.className = 'status-info';
+    
+    // Update info with sync details and offer to apply
+    syncInfoDiv.innerHTML = `
+      <p><strong>From ${syncData.sender}:</strong></p>
+      <p><strong>Page:</strong> ${limitText(syncData.pageTitle || "Video", 30)}</p>
+      <p><strong>Time:</strong> ${formatTime(syncData.currentTime)} / ${formatTime(syncData.duration)}</p>
+      <button id="newSyncBtn" class="sync-btn">Sync to this time</button>
+    `;
+    
+    // Add event listener to sync button
+    const newSyncBtn = document.getElementById('newSyncBtn');
+    if (newSyncBtn) {
+      newSyncBtn.addEventListener('click', () => {
+        applySyncToLocal(syncData.currentTime);
+      });
+    }
+  });
+  
+  // Format time to MM:SS
+  function formatTime(timeInSeconds) {
+    if (isNaN(timeInSeconds) || timeInSeconds === undefined) return "00:00";
+    
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  
+  // Limit text length
+  function limitText(text, maxLength) {
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  }
+  
+  // Return cleanup function
+  return function cleanup() {
+    // Remove all listeners
+    syncRef.off();
+    console.log("[Sync] Video sync cleanup complete for room", roomId);
+  };
+}
     // Görüşmeyi sonlandır
     function hangUp() {
       if (peerConnection) {
