@@ -31,11 +31,115 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case "openVideoChat":
             handleVideoChat(message, sendResponse);
             return true;
+        case "getVideoInfo":
+            handleGetVideoInfo(sendResponse);
+            return true;
+        case "setVideoTime":
+            handleSetVideoTime(message, sendResponse);
+            return true;
         default:
             console.warn("[SW] Bilinmeyen action türü:", message.action);
             sendResponse({ success: false, error: "UNKNOWN_ACTION" });
     }
 });
+
+// Video bilgilerini almak için aktif sekmeye mesaj gönder
+async function handleGetVideoInfo(sendResponse) {
+    try {
+        // Aktif sekmeyi bul
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs.length === 0) {
+            sendResponse({ success: false, error: "Aktif sekme bulunamadı" });
+            return;
+        }
+
+        const activeTab = tabs[0];
+        
+        // Content script'e mesaj gönder
+        chrome.tabs.sendMessage(activeTab.id, { action: "getVideoInfo" }, (response) => {
+            if (chrome.runtime.lastError) {
+                // Content script yüklenmediyse veya cevap vermediyse
+                // Content script'i enjekte et ve tekrar dene
+                chrome.scripting.executeScript({
+                    target: { tabId: activeTab.id },
+                    files: ['content-script.js']
+                }).then(() => {
+                    // Script enjekte edildikten sonra tekrar dene
+                    setTimeout(() => {
+                        chrome.tabs.sendMessage(activeTab.id, { action: "getVideoInfo" }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                sendResponse({ success: false, error: chrome.runtime.lastError.message });
+                            } else {
+                                sendResponse(response);
+                            }
+                        });
+                    }, 100); // Enjekte edilen script'in yüklenmesi için kısa bir bekleme
+                }).catch(error => {
+                    sendResponse({ success: false, error: error.message });
+                });
+            } else {
+                sendResponse(response);
+            }
+        });
+    } catch (error) {
+        console.error("[Video] Video bilgisi alma hatası:", error);
+        sendResponse({ success: false, error: error.message });
+    }
+    
+    return true; // Asenkron sendResponse için
+}
+
+// Video süresini ayarlamak için aktif sekmeye mesaj gönder
+async function handleSetVideoTime(message, sendResponse) {
+    try {
+        // Aktif sekmeyi bul
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs.length === 0) {
+            sendResponse({ success: false, error: "Aktif sekme bulunamadı" });
+            return;
+        }
+
+        const activeTab = tabs[0];
+        
+        // Content script'e mesaj gönder
+        chrome.tabs.sendMessage(activeTab.id, { 
+            action: "setVideoTime",
+            currentTime: message.currentTime
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                // Content script yüklenmediyse veya cevap vermediyse
+                // Content script'i enjekte et ve tekrar dene
+                chrome.scripting.executeScript({
+                    target: { tabId: activeTab.id },
+                    files: ['content-script.js']
+                }).then(() => {
+                    // Script enjekte edildikten sonra tekrar dene
+                    setTimeout(() => {
+                        chrome.tabs.sendMessage(activeTab.id, { 
+                            action: "setVideoTime",
+                            currentTime: message.currentTime
+                        }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                sendResponse({ success: false, error: chrome.runtime.lastError.message });
+                            } else {
+                                sendResponse(response);
+                            }
+                        });
+                    }, 100); // Enjekte edilen script'in yüklenmesi için kısa bir bekleme
+                }).catch(error => {
+                    sendResponse({ success: false, error: error.message });
+                });
+            } else {
+                sendResponse(response);
+            }
+        });
+    } catch (error) {
+        console.error("[Video] Video süresini ayarlama hatası:", error);
+        sendResponse({ success: false, error: error.message });
+    }
+    
+    return true; // Asenkron sendResponse için
+}
 
 // Google ile giriş işlemi - Firebase REST API kullanarak direkt yöntem
 async function handleGoogleAuth(sendResponse) {

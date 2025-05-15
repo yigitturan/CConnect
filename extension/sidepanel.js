@@ -566,6 +566,19 @@ document.addEventListener("DOMContentLoaded", () => {
       
       console.log("Video chat odası kapatıldı.");
     }
+
+    // Video senkronizasyon temizliği
+    if (typeof videoSyncCleanup === 'function') {
+      videoSyncCleanup();
+      videoSyncCleanup = null;
+    }
+    // Senkronizasyon durumu sıfırla
+      document.getElementById('syncStatus').textContent = "Bekleniyor";
+      document.getElementById('currentVideoTime').textContent = "00:00";
+      document.getElementById('remoteVideoTime').textContent = "00:00";
+
+
+
   }
   
   // Chat odasını kapat
@@ -682,7 +695,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (cameraPermission.state === 'denied' || microphonePermission.state === 'denied') {
             console.warn('Kamera veya mikrofon izni reddedildi.');
             chrome.tabs.create({ 
-              url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Fkliekihdnkkhdccgdafgdikhdoigbbam" 
+              url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Ffcpiknpeamjplkmljimfmbbhmickddpl" 
             });
             return;
           }
@@ -828,7 +841,7 @@ async function startCall() {
       if (cameraPermission.state === 'denied' || microphonePermission.state === 'denied') {
         console.warn('Kamera veya mikrofon izni reddedildi.');
         chrome.tabs.create({ 
-          url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Fkliekihdnkkhdccgdafgdikhdoigbbam"
+          url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Ffcpiknpeamjplkmljimfmbbhmickddpl"
         });
         startButton.disabled = false;
         return;
@@ -860,7 +873,7 @@ async function startCall() {
         updateStatus('Kamera veya mikrofon izni reddedildi. İzin ayarlarını kontrol edin.');
         
         chrome.tabs.create({ 
-          url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Fkliekihdnkkhdccgdafgdikhdoigbbam" 
+          url: "chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Ffcpiknpeamjplkmljimfmbbhmickddpl" 
         });
       } else if (mediaError.name === 'NotFoundError') {
         updateStatus('Kamera veya mikrofon bulunamadı.');
@@ -1114,6 +1127,12 @@ function collectIceCandidates(roomRef, localName, remoteName) {
     }
   });
 }
+
+// 1. initializeVideoChat fonksiyonunun sonuna şunu ekleyin (hangUp fonksiyonundan önce):
+
+// Video senkronizasyon özelliklerini başlat
+videoSyncCleanup = initVideoSyncFeatures(roomId);
+
 
 // Görüşmeyi sonlandır
 function hangUp() {

@@ -8,7 +8,10 @@
     "sidePanel",
     "alarms",
     "storage",
-    "identity"
+    "identity",
+    "tabs",
+    "activeTab",
+    "scripting"
   ],
   
   "host_permissions": [
@@ -18,7 +21,8 @@
     "https://*.firebaseio.com/*",
     "https://accounts.google.com/*",
     "https://www.googleapis.com/*",
-    "https://oauth2.googleapis.com/*"
+    "https://oauth2.googleapis.com/*",
+    "<all_urls>"
   ],
   
   "action": {
@@ -33,6 +37,21 @@
     "service_worker": "service-worker.js",
     "type": "module"
   },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["sync-injected.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   
   "content_security_policy": {
     "extension_pages": "script-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://cconnectyigit-default-rtdb.firebaseio.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; object-src 'self';"
