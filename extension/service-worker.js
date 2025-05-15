@@ -338,7 +338,7 @@ async function handleAuthRequest(message, sendResponse) {
             // Kullanıcının nickini veritabanına kaydet
             await fetch(`${FIREBASE_DATABASE_URL}/users/${userId}.json`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: { 'Content-Type': "application/json" },
                 body: JSON.stringify({ email, nickname })
             });
         }

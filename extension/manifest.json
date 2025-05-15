@@ -46,13 +46,6 @@
     }
   ],
   
-  "web_accessible_resources": [
-    {
-      "resources": ["sync-injected.js"],
-      "matches": ["<all_urls>"]
-    }
-  ],
-  
   "content_security_policy": {
     "extension_pages": "script-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://cconnectyigit-default-rtdb.firebaseio.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; object-src 'self';"
   }
