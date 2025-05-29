@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <title>Firebase Chat Panel</title>
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="video-sync-styles.css">
   <script src="firebase/firebase-app-compat.js"></script>
   <script src="firebase/firebase-database-compat.js"></script>
-  <script src="video-sync-functions.js"></script>
   <script defer src="sidepanel.js"></script>
 </head>
 <body>
@@ -120,21 +118,18 @@
       
       <!-- Video Senkronizasyon Bölümü -->
       <div id="video-sync-section">
-        <h4>Video Senkronizasyonu</h4>
-        <div class="sync-controls">
-          <button id="syncVideoBtn" class="sync-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-            </svg>
-            Aktif Video İle Senkronize Et
-          </button>
-          <div class="sync-status">
-            <p>Senkronizasyon Durumu: <span id="syncStatus">Bekleniyor</span></p>
-          </div>
+        <h4>🎬 Otomatik Video Senkronizasyonu</h4>
+        <div class="sync-status">
+          <p>Durum: <span id="syncStatus">⏸️ Senkronizasyon kapalı</span></p>
         </div>
         <div class="video-time-info">
-          <p>Aktif video süresi: <span id="currentVideoTime">00:00</span></p>
-          <p>Karşı taraf video süresi: <span id="remoteVideoTime">00:00</span></p>
+          <p>Senin video süren: <span id="currentVideoTime">00:00</span></p>
+          <p>Arkadaşının video süresi: <span id="remoteVideoTime">00:00</span></p>
+        </div>
+        <div class="sync-info">
+          <p style="font-size: 10px; color: #888; text-align: center; margin: 5px 0;">
+            💡 Video odasına katıldığında otomatik senkronizasyon başlar
+          </p>
         </div>
       </div>
     </div>

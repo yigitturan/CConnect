@@ -21,6 +21,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const messageInput = document.getElementById("messageInput");
   const sendMessageBtn = document.getElementById("sendMessageBtn");
   
+  // Video senkronizasyon elemanları
+  const syncStatus = document.getElementById("syncStatus");
+  const currentVideoTime = document.getElementById("currentVideoTime");
+  const remoteVideoTime = document.getElementById("remoteVideoTime");
+  
   // Password validation rules
   const passwordValidation = {
     minLength: 12,
@@ -77,7 +82,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentChatRoomId = "";
   let currentMessagesRef = null;
   let messagesListener = null;
-  let videoSyncCleanup = null;
+  
+  // Video senkronizasyon değişkenleri
+  let videoSyncRef = null;
+  let videoSyncListener = null;
+  let isVideoSyncActive = false;
+  let syncUpdateInterval = null;
+  let videoEventListenerInterval = null;
+  let isSyncLeader = false;
+  let lastKnownVideoState = null;
+  let ignoreNextSyncEvent = false;
+  let syncToleranceSeconds = 1; // 1 saniye tolerans
+  
   const statusP = document.getElementById("status");
   
   // Firebase config
@@ -154,6 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     return colorMap.get(username);
   }
+  
   // Rastgele kod oluşturma (6 karakter alfanümerik)
   function generateRandomCode() {
     const codeChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -172,6 +189,306 @@ document.addEventListener("DOMContentLoaded", () => {
       statusP.textContent = "";
     }, 5000);
   }
+  
+  // ================== OTOMATİK VİDEO SENKRONİZASYON SİSTEMİ ==================
+  
+  // Video odasına katıldığında otomatik senkronizasyonu başlat
+  function startAutoVideoSync(roomId) {
+    if (!roomId || isVideoSyncActive) {
+      return;
+    }
+    
+    console.log("[AutoSync] Video senkronizasyonu başlatılıyor:", roomId);
+    
+    currentVideoRoomId = roomId;
+    isVideoSyncActive = true;
+    videoSyncRef = database.ref('videoSync/' + roomId);
+    
+    // Önce odaya katıl
+    joinVideoSyncRoom()
+      .then(() => {
+        // Senkronizasyon döngüsünü başlat
+        startVideoEventMonitoring();
+        startVideoSyncListener();
+        updateSyncStatus("🎬 Otomatik senkronizasyon aktif");
+      })
+      .catch(error => {
+        console.error("[AutoSync] Başlatma hatası:", error);
+        updateSyncStatus("❌ Senkronizasyon hatası");
+      });
+  }
+  
+  // Video senkronizasyon odasına katıl
+  async function joinVideoSyncRoom() {
+    try {
+      // Mevcut oda durumunu kontrol et
+      const snapshot = await videoSyncRef.once('value');
+      const existingData = snapshot.val();
+      
+      if (!existingData || Object.keys(existingData.participants || {}).length === 0) {
+        // İlk kullanıcı - lider ol
+        isSyncLeader = true;
+        await videoSyncRef.set({
+          leader: currentUserNickname,
+          createdAt: Date.now(),
+          participants: {
+            [currentUserNickname]: {
+              joinedAt: Date.now(),
+              isLeader: true,
+              lastSeen: Date.now()
+            }
+          },
+          videoState: {
+            currentTime: 0,
+            duration: 0,
+            paused: true,
+            timestamp: Date.now(),
+            user: currentUserNickname,
+            url: "",
+            title: ""
+          }
+        });
+        console.log("[AutoSync] Lider olarak odaya katıldı");
+      } else {
+        // Takipçi olarak katıl
+        isSyncLeader = false;
+        await videoSyncRef.child('participants/' + currentUserNickname).set({
+          joinedAt: Date.now(),
+          isLeader: false,
+          lastSeen: Date.now()
+        });
+        console.log("[AutoSync] Takipçi olarak odaya katıldı");
+      }
+      
+      // Bağlantı kesildiğinde temizlik yap
+      videoSyncRef.child('participants/' + currentUserNickname).onDisconnect().remove();
+      
+    } catch (error) {
+      console.error("[AutoSync] Odaya katılma hatası:", error);
+      throw error;
+    }
+  }
+  
+  // Video olaylarını izleme sistemi
+  function startVideoEventMonitoring() {
+    if (videoEventListenerInterval) {
+      clearInterval(videoEventListenerInterval);
+    }
+    
+    let lastVideoInfo = null;
+    
+    videoEventListenerInterval = setInterval(async () => {
+      if (!isVideoSyncActive || !currentVideoRoomId) {
+        return;
+      }
+      
+      try {
+        // Aktif video bilgilerini al
+        chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
+          if (response && response.success) {
+            const currentVideoInfo = {
+              currentTime: Math.floor(response.currentTime * 10) / 10, // 0.1 saniye hassasiyet
+              duration: response.duration,
+              paused: response.paused,
+              url: response.videoUrl,
+              title: response.pageTitle,
+              playerType: response.playerType,
+              timestamp: Date.now(),
+              user: currentUserNickname
+            };
+            
+            // Video durumu değişti mi kontrol et
+            if (hasVideoStateChanged(lastVideoInfo, currentVideoInfo)) {
+              console.log("[AutoSync] Video durumu değişti:", currentVideoInfo);
+              
+              if (isSyncLeader) {
+                // Lider ise durumu Firebase'e gönder
+                broadcastVideoState(currentVideoInfo);
+              }
+              
+              lastVideoInfo = { ...currentVideoInfo };
+              updateCurrentVideoTime(currentVideoInfo.currentTime);
+            }
+          }
+        });
+        
+        // Son görülme zamanını güncelle
+        if (videoSyncRef) {
+          videoSyncRef.child('participants/' + currentUserNickname + '/lastSeen').set(Date.now());
+        }
+        
+      } catch (error) {
+        console.error("[AutoSync] Video izleme hatası:", error);
+      }
+    }, 500); // Her 0.5 saniyede kontrol et
+  }
+  
+  // Video durumu değişiklik kontrolü
+  function hasVideoStateChanged(oldState, newState) {
+    if (!oldState) return true;
+    
+    return (
+      Math.abs(oldState.currentTime - newState.currentTime) > 0.5 || // 0.5 saniye fark
+      oldState.paused !== newState.paused ||
+      oldState.url !== newState.url ||
+      Math.abs(oldState.duration - newState.duration) > 1
+    );
+  }
+  
+  // Video durumunu Firebase'e gönder (sadece lider)
+  async function broadcastVideoState(videoInfo) {
+    if (!isSyncLeader || !videoSyncRef) return;
+    
+    try {
+      await videoSyncRef.child('videoState').set(videoInfo);
+      console.log("[AutoSync] Video durumu gönderildi:", videoInfo);
+    } catch (error) {
+      console.error("[AutoSync] Video durumu gönderme hatası:", error);
+    }
+  }
+  
+  // Firebase'den video durumu değişikliklerini dinle
+  function startVideoSyncListener() {
+    if (videoSyncListener) {
+      videoSyncRef.off('value', videoSyncListener);
+    }
+    
+    videoSyncListener = videoSyncRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (!data || !data.videoState) return;
+      
+      const remoteVideoState = data.videoState;
+      
+      // Kendi gönderdiğin durumu ignore et
+      if (remoteVideoState.user === currentUserNickname) {
+        return;
+      }
+      
+      console.log("[AutoSync] Uzak video durumu alındı:", remoteVideoState);
+      
+      // UI'yi güncelle
+      updateRemoteVideoTime(remoteVideoState.currentTime || 0);
+      
+      // Takipçi ise ve ignore flag aktif değilse senkronize ol
+      if (!isSyncLeader && !ignoreNextSyncEvent) {
+        syncToRemoteVideoState(remoteVideoState);
+      }
+      
+      // Katılımcı sayısını güncelle
+      const participants = data.participants || {};
+      const participantCount = Object.keys(participants).length;
+      updateSyncStatus(`🎬 Senkronizasyon aktif (${participantCount} kişi)`);
+    });
+  }
+  
+  // Uzak video durumuna senkronize ol
+  function syncToRemoteVideoState(remoteState) {
+    if (ignoreNextSyncEvent) return;
+    
+    chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
+      if (!response || !response.success) return;
+      
+      const localTime = response.currentTime;
+      const remoteTime = remoteState.currentTime;
+      const timeDiff = Math.abs(localTime - remoteTime);
+      const isPausedDiff = response.paused !== remoteState.paused;
+      
+      console.log(`[AutoSync] Senkronizasyon kontrolü: Yerel=${localTime}s, Uzak=${remoteTime}s, Fark=${timeDiff}s, Pause farkı=${isPausedDiff}`);
+      
+      // Büyük zaman farkı varsa senkronize et
+      if (timeDiff > syncToleranceSeconds) {
+        console.log("[AutoSync] Zaman farkı tespit edildi, senkronize ediliyor");
+        
+        ignoreNextSyncEvent = true;
+        
+        chrome.runtime.sendMessage({
+          action: "setVideoTime",
+          currentTime: remoteTime
+        }, (syncResponse) => {
+          if (syncResponse && syncResponse.success) {
+            console.log("[AutoSync] Video süresi senkronize edildi");
+          }
+          
+          setTimeout(() => {
+            ignoreNextSyncEvent = false;
+          }, 2000);
+        });
+      }
+      
+      // Pause/play durumu farklıysa senkronize et
+      if (isPausedDiff) {
+        console.log("[AutoSync] Play/Pause durumu senkronize ediliyor");
+        
+        if (remoteState.paused && !response.paused) {
+          // Uzak taraf duraklatmış, yerel videoyu duraklat
+          chrome.runtime.sendMessage({ action: "pauseVideo" });
+        } else if (!remoteState.paused && response.paused) {
+          // Uzak taraf oynatıyor, yerel videoyu oynat
+          chrome.runtime.sendMessage({ action: "playVideo" });
+        }
+      }
+    });
+  }
+  
+  // Video senkronizasyonunu durdur
+  function stopAutoVideoSync() {
+    console.log("[AutoSync] Video senkronizasyonu durduruluyor");
+    
+    isVideoSyncActive = false;
+    
+    if (videoEventListenerInterval) {
+      clearInterval(videoEventListenerInterval);
+      videoEventListenerInterval = null;
+    }
+    
+    if (videoSyncListener && videoSyncRef) {
+      videoSyncRef.off('value', videoSyncListener);
+      videoSyncListener = null;
+    }
+    
+    if (videoSyncRef && currentUserNickname) {
+      // Katılımcı listesinden çık
+      videoSyncRef.child('participants/' + currentUserNickname).remove();
+    }
+    
+    videoSyncRef = null;
+    isSyncLeader = false;
+    lastKnownVideoState = null;
+    ignoreNextSyncEvent = false;
+    
+    updateSyncStatus("⏸️ Senkronizasyon durduruldu");
+    updateCurrentVideoTime(0);
+    updateRemoteVideoTime(0);
+  }
+  
+  // UI güncelleyici fonksiyonlar
+  function updateSyncStatus(status) {
+    if (syncStatus) {
+      syncStatus.textContent = status;
+      console.log("[AutoSync] Durum:", status);
+    }
+  }
+  
+  function updateCurrentVideoTime(timeInSeconds) {
+    if (currentVideoTime) {
+      currentVideoTime.textContent = formatTime(timeInSeconds);
+    }
+  }
+  
+  function updateRemoteVideoTime(timeInSeconds) {
+    if (remoteVideoTime) {
+      remoteVideoTime.textContent = formatTime(timeInSeconds);
+    }
+  }
+  
+  function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  // ================== MEVCUT KOD DEVAM EDİYOR ==================
   
   // Google ile giriş işlemi
   if (googleLoginBtn) {
@@ -303,6 +620,9 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Tüm odaları ve durumları sıfırla
   function resetAllRooms() {
+    // Video senkronizasyonunu durdur
+    stopAutoVideoSync();
+    
     // Video odası sıfırlama
     videoContainer.classList.add("hidden");
     currentVideoRoomId = "";
@@ -394,6 +714,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Chat kodu oluşturulurken bir hata oluştu: " + error.message);
     }
   });
+  
   // Video kodu kopyalama
   copyVideoCodeBtn.addEventListener("click", () => {
     navigator.clipboard.writeText(generatedVideoCode.textContent).then(() => {
@@ -454,6 +775,11 @@ document.addEventListener("DOMContentLoaded", () => {
       // Video chat başlat
       initializeVideoChat(code);
       
+      // OTOMATİK VİDEO SENKRONİZASYONUNU BAŞLAT
+      setTimeout(() => {
+        startAutoVideoSync(code);
+      }, 1000); // Video chat başladıktan sonra senkronizasyonu başlat
+      
       console.log(`Video odasına katılındı: ${code}`);
     } catch (error) {
       console.error("Video odasına katılma hatası:", error);
@@ -511,6 +837,9 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Video chat odasını kapat
   function closeVideoChatRoom() {
+    // Video senkronizasyonunu durdur
+    stopAutoVideoSync();
+    
     if (currentVideoRoomId) {
       // WebRTC bağlantısını kapat
       if (window.currentPeerConnection) {
@@ -551,21 +880,6 @@ document.addEventListener("DOMContentLoaded", () => {
       
       console.log("Video chat odası kapatıldı.");
     }
-
-    // Video senkronizasyon temizliği
-    if (typeof videoSyncCleanup === 'function') {
-      videoSyncCleanup();
-      videoSyncCleanup = null;
-    }
-    
-    // Senkronizasyon durumu sıfırla
-    const syncStatus = document.getElementById('syncStatus');
-    const currentVideoTime = document.getElementById('currentVideoTime');
-    const remoteVideoTime = document.getElementById('remoteVideoTime');
-    
-    if (syncStatus) syncStatus.textContent = "Bekleniyor";
-    if (currentVideoTime) currentVideoTime.textContent = "00:00";
-    if (remoteVideoTime) remoteVideoTime.textContent = "00:00";
   }
   
   // Chat odasını kapat
@@ -652,6 +966,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
+  
   // Video chat işlevlerini başlat
   function initializeVideoChat(roomId) {
     // Global değişkenler
@@ -1053,15 +1368,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    // Video senkronizasyon özelliklerini başlat
-    function initVideoSyncFeatures(roomId) {
-      // Video senkronizasyon özelliği kodlarını buraya ekleyin
-      // Bu fonksiyon, video senkronizasyonu için gerekli olan temizleme fonksiyonunu döndürmeli
-      return function() {
-        // Temizleme kodları
-      };
-    }
-    
     // Görüşmeyi sonlandır
     function hangUp() {
       if (peerConnection) {
@@ -1103,9 +1409,6 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Başlangıç durumunda UI güncelle
     updateMediaUI();
-    
-    // Video senkronizasyon özelliklerini başlat
-    videoSyncCleanup = initVideoSyncFeatures(roomId);
     
     return {
       close: hangUp
