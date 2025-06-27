@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Firebase Auth Sidepanel Extension",
-  "description": "Manifest V3 Chrome extension using Firebase Auth (REST API) with side panel.",
+  "name": "Video Senkronizasyon & Chat Extension",
+  "description": "Arkadaşlarınla birlikte video izle ve sohbet et!",
   "version": "1.0.0",
   
   "permissions": [
@@ -11,7 +11,8 @@
     "identity",
     "tabs",
     "activeTab",
-    "scripting"
+    "scripting",
+    "webNavigation"
   ],
   
   "host_permissions": [
@@ -26,7 +27,7 @@
   ],
   
   "action": {
-    "default_title": "Yan Paneli Aç"
+    "default_title": "Video Sync & Chat"
   },
   
   "side_panel": {
@@ -42,11 +43,28 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content-script.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "firebase/*",
+        "sidepanel.html",
+        "styles.css"
+      ],
+      "matches": ["<all_urls>"]
     }
   ],
   
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://cconnectyigit-default-rtdb.firebaseio.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; object-src 'self';"
+    "extension_pages": "script-src 'self'; script-src-elem 'self' https://cconnectyigit-default-rtdb.firebaseio.com https://*.firebaseio.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://cconnectyigit-default-rtdb.firebaseio.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; object-src 'self';"
+  },
+  
+  "oauth2": {
+    "client_id": "731610663845-lcusivrfp2viicfthssffm6kkdfih5i2.apps.googleusercontent.com",
+    "scopes": ["email", "profile"]
   }
 }

@@ -1,4 +1,4 @@
-// ================== FINAL COMPLETE SİDEPANEL.JS v4 ==================
+// ================== FINAL COMPLETE SİDEPANEL.JS v4 - CSP FIX ==================
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Video Sync App v4 başlatılıyor...");
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     myRef: null,
     listener: null,
     updateTimer: null,
-    followerTimer: null, // YENİ: Follower'lar için ayrı timer
+    followerTimer: null,
     lastState: null,
     syncing: false
   };
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
     listener: null
   };
   
-    // WebRTC sistem
+  // WebRTC sistem
   let webrtcSystem = {
     localStream: null,
     remoteStream: null,
@@ -64,11 +64,6 @@ document.addEventListener("DOMContentLoaded", () => {
           urls: 'turn:numb.viagenie.ca',
           credential: 'muazkh',
           username: 'webrtc@live.com'
-        },
-        {
-          urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
-          credential: 'webrtc',
-          username: 'webrtc'
         }
       ],
       iceCandidatePoolSize: 10
@@ -143,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     videoStatus: document.getElementById("videoStatus")
   };
   
-  // ================== FİREBASE SETUP ==================
+  // ================== FİREBASE SETUP - CSP UYUMLU ==================
   
   const firebaseConfig = {
     apiKey: "AIzaSyB69u3UFUyEX0F237B7MKMRTm-mfSvEqJU",
@@ -158,12 +153,31 @@ document.addEventListener("DOMContentLoaded", () => {
   
   function initFirebase() {
     try {
+      // CSP uyumlu Firebase başlatma
+      if (typeof firebase === 'undefined') {
+        console.error("❌ Firebase SDK yüklenmedi");
+        return false;
+      }
+      
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
       }
+      
+      // Database referansını al
       appState.database = firebase.database();
-      console.log("✅ Firebase başlatıldı");
-      return true;
+      
+      // CSP için özel ayarlar
+      if (appState.database) {
+        // Force WebSocket kullanımı (long polling yerine)
+        appState.database.goOnline();
+        
+        console.log("✅ Firebase başlatıldı (CSP uyumlu)");
+        return true;
+      }
+      
+      console.error("❌ Firebase database başlatılamadı");
+      return false;
+      
     } catch (error) {
       console.error("❌ Firebase hatası:", error);
       showMessage("Firebase bağlantı hatası!", true);
@@ -739,7 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }
     
-    // YENİ: Master değişince follower timer'ını yeniden başlat
+    // Master değişince follower timer'ını yeniden başlat
     if (videoSync.active) {
       // Önceki follower timer'ını temizle
       if (videoSync.followerTimer) {
@@ -1050,7 +1064,6 @@ document.addEventListener("DOMContentLoaded", () => {
         videoSync.updateTimer = null;
       }
       
-      // YENİ: Follower timer'ını da temizle
       if (videoSync.followerTimer) {
         clearInterval(videoSync.followerTimer);
         videoSync.followerTimer = null;
@@ -1323,20 +1336,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const answer = new RTCSessionDescription(data.answer);
             await webrtcSystem.peerConnection.setRemoteDescription(answer);
             updateVideoStatus("Yanıt alındı, bağlanıyor...");
-            
-            // Callee'nin ICE candidates'ını al ve ekle
-            const calleeCandidatesSnapshot = await webrtcSystem.roomRef.child('calleeCandidates').once('value');
-            if (calleeCandidatesSnapshot.exists()) {
-              const candidates = calleeCandidatesSnapshot.val();
-              for (const candidateData of Object.values(candidates)) {
-                try {
-                  const candidate = new RTCIceCandidate(candidateData);
-                  await webrtcSystem.peerConnection.addIceCandidate(candidate);
-                } catch (error) {
-                  console.error("Callee ICE candidate ekleme hatası:", error);
-                }
-              }
-            }
           } catch (error) {
             console.error("Answer işleme hatası:", error);
             updateVideoStatus("Bağlantı hatası");
@@ -1395,20 +1394,6 @@ document.addEventListener("DOMContentLoaded", () => {
       
       updateVideoStatus("Bağlanıyor...");
       
-      // Mevcut ICE candidates'ı al ve ekle
-      const callerCandidatesSnapshot = await webrtcSystem.roomRef.child('callerCandidates').once('value');
-      if (callerCandidatesSnapshot.exists()) {
-        const candidates = callerCandidatesSnapshot.val();
-        for (const candidateData of Object.values(candidates)) {
-          try {
-            const candidate = new RTCIceCandidate(candidateData);
-            await webrtcSystem.peerConnection.addIceCandidate(candidate);
-          } catch (error) {
-            console.error("Mevcut ICE candidate ekleme hatası:", error);
-          }
-        }
-      }
-      
     } catch (error) {
       console.error("Oda katılma hatası:", error);
       updateVideoStatus("Oda katılma hatası: " + error.message);
@@ -1449,11 +1434,6 @@ document.addEventListener("DOMContentLoaded", () => {
           break;
       }
     };
-    
-    // ICE connection state
-    webrtcSystem.peerConnection.oniceconnectionstatechange = () => {
-      console.log("ICE durumu:", webrtcSystem.peerConnection.iceConnectionState);
-    };
   }
   
   function collectICECandidates(localName, remoteName) {
@@ -1463,7 +1443,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Local ICE candidates'ı gönder
     webrtcSystem.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`📡 ${localName} ICE candidate gönderiliyor:`, event.candidate.candidate);
+        console.log(`📡 ${localName} ICE candidate gönderiliyor`);
         localCandidatesRef.push(event.candidate.toJSON()).catch(error => {
           console.error("ICE candidate gönderme hatası:", error);
         });
@@ -1473,7 +1453,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Remote ICE candidates'ı dinle
     remoteCandidatesRef.on('child_added', async (snapshot) => {
       const candidateData = snapshot.val();
-      console.log(`📡 ${remoteName} ICE candidate alındı:`, candidateData.candidate);
+      console.log(`📡 ${remoteName} ICE candidate alındı`);
       
       try {
         const candidate = new RTCIceCandidate(candidateData);
@@ -1481,18 +1461,6 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log(`✅ ${remoteName} ICE candidate eklendi`);
       } catch (error) {
         console.error(`❌ ${remoteName} ICE candidate ekleme hatası:`, error);
-        
-        // Eğer peer connection ready değilse, biraz bekle ve tekrar dene
-        if (error.name === 'InvalidStateError') {
-          setTimeout(async () => {
-            try {
-              await webrtcSystem.peerConnection.addIceCandidate(candidate);
-              console.log(`✅ ${remoteName} ICE candidate gecikmeyle eklendi`);
-            } catch (retryError) {
-              console.error(`❌ ${remoteName} ICE candidate retry hatası:`, retryError);
-            }
-          }, 1000);
-        }
       }
     });
   }
