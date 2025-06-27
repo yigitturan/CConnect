@@ -2,7 +2,8 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Firebase Chat Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Senkronizasyon & Chat Extension</title>
   <link rel="stylesheet" href="styles.css">
   <script src="firebase/firebase-app-compat.js"></script>
   <script src="firebase/firebase-database-compat.js"></script>
@@ -10,145 +11,456 @@
 </head>
 <body>
 
-  <!-- Giriş Ekranı -->
+  <!-- ================== GİRİŞ EKRANI ================== -->
   <div id="login-screen">
-    <h2>Giriş Yap</h2>
-    <input type="email" id="email" placeholder="E-posta" required />
-    <input type="password" id="password" placeholder="Şifre" required />
-    <button id="loginBtn">Giriş Yap</button>
-    <button id="googleLoginBtn" class="google-btn">Google ile Giriş Yap</button>
-    <p class="switch-screen">Hesabın yok mu? <a href="#" id="showSignup">Kayıt Ol</a></p>
-    <p id="status"></p>
+    <div class="auth-container">
+      <div class="auth-header">
+        <h2>🎬 Video Senkronizasyon</h2>
+        <p>Arkadaşlarınla birlikte video izle!</p>
+      </div>
+      
+      <div class="auth-form">
+        <input type="email" id="email" placeholder="E-posta adresin" required />
+        <input type="password" id="password" placeholder="Şifren" required />
+        
+        <button id="loginBtn" class="auth-btn primary">
+          <span>🔑 Giriş Yap</span>
+        </button>
+        
+        <div class="divider">
+          <span>veya</span>
+        </div>
+        
+        <button id="googleLoginBtn" class="auth-btn google">
+          <span>🌐 Google ile Giriş Yap</span>
+        </button>
+        
+        <p class="switch-screen">
+          Hesabın yok mu? 
+          <a href="#" id="showSignup" class="link">Kayıt Ol</a>
+        </p>
+      </div>
+      
+      <div class="status-container">
+        <p id="status" class="status-message"></p>
+      </div>
+    </div>
   </div>
 
-  <!-- Kayıt Ol Ekranı -->
+  <!-- ================== KAYIT OL EKRANI ================== -->
   <div id="signup-screen" class="hidden">
-    <h2>Kayıt Ol</h2>
-    <input type="email" id="signup-email" placeholder="E-posta" required />
-    <input type="password" id="signup-password" placeholder="Şifre" required />
-    <input type="text" id="nickname" placeholder="Takma Ad (Nickname)" required />
-    <button id="signupBtn">Kayıt Ol</button>
-    <p class="switch-screen">Zaten hesabın var mı? <a href="#" id="showLogin">Giriş Yap</a></p>
+    <div class="auth-container">
+      <div class="auth-header">
+        <h2>📝 Yeni Hesap Oluştur</h2>
+        <p>Hemen başla, ücretsiz!</p>
+      </div>
+      
+      <div class="auth-form">
+        <input type="email" id="signup-email" placeholder="E-posta adresin" required />
+        <input type="password" id="signup-password" placeholder="Güçlü bir şifre oluştur" required />
+        <input type="text" id="nickname" placeholder="Takma adın (arkadaşların görecek)" required />
+        
+        <button id="signupBtn" class="auth-btn primary">
+          <span>✨ Hesap Oluştur</span>
+        </button>
+        
+        <p class="switch-screen">
+          Zaten hesabın var mı? 
+          <a href="#" id="showLogin" class="link">Giriş Yap</a>
+        </p>
+      </div>
+      
+      <div class="password-requirements">
+        <h4>🔒 Şifre Gereksinimleri:</h4>
+        <ul>
+          <li>En az 12 karakter uzunluğunda</li>
+          <li>En az 1 büyük harf (A-Z)</li>
+          <li>En az 1 küçük harf (a-z)</li>
+          <li>En az 1 rakam (0-9)</li>
+        </ul>
+      </div>
+    </div>
   </div>
 
-  <!-- Ana Uygulama Ekranı -->
+  <!-- ================== ANA UYGULAMA EKRANI ================== -->
   <div id="app-container" class="hidden">
-    <!-- Kullanıcı Bilgisi -->
-    <div id="user-info">
-      <p id="welcomeMsg"></p>
-      <button id="logoutBtn">Çıkış Yap</button>
+    
+    <!-- Kullanıcı Bilgisi Header -->
+    <div id="user-info" class="user-header">
+      <div class="user-welcome">
+        <p id="welcomeMsg" class="welcome-text">Merhaba!</p>
+      </div>
+      <button id="logoutBtn" class="logout-btn">
+        <span>🚪 Çıkış</span>
+      </button>
     </div>
     
-    <!-- Kod Oluşturma Bölümü -->
-    <div id="code-creation-section">
-      <div class="room-buttons">
-        <button id="createVideoChatCodeBtn" class="primary-button video-btn">Video Kodu Oluştur</button>
-        <button id="createChatCodeBtn" class="primary-button chat-btn">Chat Kodu Oluştur</button>
-      </div>
-      
-      <div id="videoCodeDisplay" class="code-display hidden">
-        <p>Video Kodu: <span id="generatedVideoCode">-</span> 
-          <button id="copyVideoCodeBtn" class="copy-btn">Kopyala</button>
-        </p>
-      </div>
-      
-      <div id="chatCodeDisplay" class="code-display hidden">
-        <p>Chat Kodu: <span id="generatedChatCode">-</span>
-          <button id="copyChatCodeBtn" class="copy-btn">Kopyala</button>
-        </p>
+    <!-- Ana Navigasyon -->
+    <div class="main-navigation">
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="rooms">🏠 Odalar</button>
+        <button class="nav-tab" data-tab="video">🎥 Video Chat</button>
+        <button class="nav-tab" data-tab="chat">💬 Metin Chat</button>
       </div>
     </div>
     
-    <!-- Kod Giriş Bölümü -->
-    <div id="code-entry-section">
-      <div class="code-entry">
-        <input id="videoCodeInput" placeholder="Video Kodu" />
-        <button id="joinVideoRoomBtn">Video Odasına Katıl</button>
+    <!-- ================== ODA OLUŞTURMA VE KATILMA ================== -->
+    <div id="rooms-section" class="tab-content active">
+      <div class="section-header">
+        <h3>🎯 Oda Yönetimi</h3>
+        <p>Video veya chat odası oluştur, arkadaşlarını davet et!</p>
       </div>
       
-      <div class="code-entry">
-        <input id="chatCodeInput" placeholder="Chat Kodu" />
-        <button id="joinChatRoomBtn">Chat Odasına Katıl</button>
+      <!-- Oda Oluşturma -->
+      <div class="room-creation">
+        <h4>🏗️ Yeni Oda Oluştur</h4>
+        <div class="room-buttons">
+          <button id="createVideoChatCodeBtn" class="room-btn video-room">
+            <div class="room-btn-content">
+              <span class="room-icon">🎥</span>
+              <div class="room-text">
+                <strong>Video Odası</strong>
+                <small>Görüntülü görüşme + video senkronizasyon</small>
+              </div>
+            </div>
+          </button>
+          
+          <button id="createChatCodeBtn" class="room-btn chat-room">
+            <div class="room-btn-content">
+              <span class="room-icon">💬</span>
+              <div class="room-text">
+                <strong>Chat Odası</strong>
+                <small>Sadece metin tabanlı sohbet</small>
+              </div>
+            </div>
+          </button>
+        </div>
+        
+        <!-- Oluşturulan Kodları Gösterme -->
+        <div id="videoCodeDisplay" class="code-display hidden">
+          <div class="code-card video-code">
+            <h5>🎥 Video Odası Kodu</h5>
+            <div class="code-value">
+              <span id="generatedVideoCode" class="code-text">------</span>
+              <button id="copyVideoCodeBtn" class="copy-btn" title="Kodu Kopyala">
+                📋
+              </button>
+            </div>
+            <p class="code-instruction">Bu kodu arkadaşlarınla paylaş!</p>
+          </div>
+        </div>
+        
+        <div id="chatCodeDisplay" class="code-display hidden">
+          <div class="code-card chat-code">
+            <h5>💬 Chat Odası Kodu</h5>
+            <div class="code-value">
+              <span id="generatedChatCode" class="code-text">------</span>
+              <button id="copyChatCodeBtn" class="copy-btn" title="Kodu Kopyala">
+                📋
+              </button>
+            </div>
+            <p class="code-instruction">Bu kodu arkadaşlarınla paylaş!</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Oda Katılma -->
+      <div class="room-joining">
+        <h4>🚪 Odaya Katıl</h4>
+        
+        <div class="join-section">
+          <div class="join-card">
+            <div class="join-header">
+              <span class="join-icon">🎥</span>
+              <h5>Video Odasına Katıl</h5>
+            </div>
+            <div class="join-form">
+              <input 
+                id="videoCodeInput" 
+                type="text" 
+                placeholder="6 haneli video kodu (örn: ABC123)" 
+                maxlength="6" 
+                class="code-input"
+              />
+              <button id="joinVideoRoomBtn" class="join-btn video-join">
+                🎥 Katıl
+              </button>
+            </div>
+          </div>
+          
+          <div class="join-card">
+            <div class="join-header">
+              <span class="join-icon">💬</span>
+              <h5>Chat Odasına Katıl</h5>
+            </div>
+            <div class="join-form">
+              <input 
+                id="chatCodeInput" 
+                type="text" 
+                placeholder="6 haneli chat kodu (örn: XYZ789)" 
+                maxlength="6" 
+                class="code-input"
+              />
+              <button id="joinChatRoomBtn" class="join-btn chat-join">
+                💬 Katıl
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Video Chat Container (Başlangıçta Gizli) -->
-    <div id="video-chat-container" class="hidden">
-      <div class="video-header">
-        <h3>Video Görüşmesi</h3>
-        <button id="closeVideoChat" class="close-button">Kapat</button>
-      </div>
-      <div class="videos">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <video id="remoteVideo" autoplay playsinline></video>
-      </div>
-      <div class="media-controls">
-        <button id="cameraToggle" class="media-control-btn" title="Kamerayı Aç/Kapat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-on">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-off hidden">
-            <line x1="1" y1="1" x2="23" y2="23"></line>
-            <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06a4 4 0 1 1-5.56-5.56"></path>
-          </svg>
-        </button>
-        <button id="micToggle" class="media-control-btn" title="Mikrofonu Aç/Kapat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mic-on">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" y1="19" x2="12" y2="23"></line>
-            <line x1="8" y1="23" x2="16" y2="23"></line>
-          </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mic-off hidden">
-            <line x1="1" y1="1" x2="23" y2="23"></line>
-            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
-            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
-            <line x1="12" y1="19" x2="12" y2="23"></line>
-            <line x1="8" y1="23" x2="16" y2="23"></line>
-          </svg>
-        </button>
-        <button id="startButton" class="media-control-btn">Görüşmeyi Başlat</button>
-        <button id="hangupButton" class="media-control-btn" disabled>Sonlandır</button>
-      </div>
-      <div id="roomInfo">
-        <p>Oda Kodu: <span id="currentVideoCode">---</span></p>
-        <p>Durum: <span id="videoStatus">Görüşmeyi başlatmak için tıklayın</span></p>
-      </div>
-      
-      <!-- Video Senkronizasyon Bölümü -->
-      <div id="video-sync-section">
-        <h4>🎬 Otomatik Video Senkronizasyonu</h4>
-        <div class="sync-status">
-          <p>Durum: <span id="syncStatus">⏸️ Senkronizasyon kapalı</span></p>
+    <!-- ================== VIDEO CHAT CONTAINER ================== -->
+    <div id="video-chat-container" class="tab-content hidden">
+      <div class="video-chat-wrapper">
+        
+        <!-- Video Chat Header -->
+        <div class="video-header">
+          <div class="video-title">
+            <h3>🎥 Video Görüşmesi</h3>
+            <div class="room-info">
+              <span class="room-code-label">Oda Kodu:</span>
+              <span id="currentVideoCode" class="room-code-value">---</span>
+            </div>
+          </div>
+          <button id="closeVideoChat" class="close-button">
+            <span>✖️ Kapat</span>
+          </button>
         </div>
-        <div class="video-time-info">
-          <p>Senin video süren: <span id="currentVideoTime">00:00</span></p>
-          <p>Arkadaşının video süresi: <span id="remoteVideoTime">00:00</span></p>
+        
+        <!-- Video Streams -->
+        <div class="videos-container">
+          <div class="video-wrapper local-video-wrapper">
+            <video id="localVideo" autoplay muted playsinline class="video-stream"></video>
+            <div class="video-label">Sen</div>
+          </div>
+          <div class="video-wrapper remote-video-wrapper">
+            <video id="remoteVideo" autoplay playsinline class="video-stream"></video>
+            <div class="video-label">Arkadaşın</div>
+          </div>
         </div>
-        <div class="sync-info">
-          <p style="font-size: 10px; color: #888; text-align: center; margin: 5px 0;">
-            💡 Video odasına katıldığında otomatik senkronizasyon başlar
-          </p>
+        
+        <!-- Media Controls -->
+        <div class="media-controls">
+          <button id="cameraToggle" class="media-control-btn camera-btn active" title="Kamerayı Aç/Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-on">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-off hidden">
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+              <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06a4 4 0 1 1-5.56-5.56"></path>
+            </svg>
+          </button>
+          
+          <button id="micToggle" class="media-control-btn mic-btn active" title="Mikrofonu Aç/Kapat">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mic-on">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mic-off hidden">
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
+          
+          <button id="startButton" class="media-control-btn start-btn">
+            <span>🚀 Görüşmeyi Başlat</span>
+          </button>
+          
+          <button id="hangupButton" class="media-control-btn hangup-btn" disabled>
+            <span>📞 Sonlandır</span>
+          </button>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="connection-status">
+          <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="videoStatus" class="status-text">Görüşmeyi başlatmak için tıklayın</span>
+          </div>
+        </div>
+        
+        <!-- ================== MASTER-FOLLOWER KONTROL SİSTEMİ ================== -->
+        <div id="master-control-section" class="master-control-section">
+          <div class="master-header">
+            <h4>👑 Master Kontrol Sistemi</h4>
+            <div class="master-description">
+              <small>Hangi kullanıcının video kontrolünde olduğunu belirler</small>
+            </div>
+          </div>
+          
+          <div class="master-info-card">
+            <div class="master-status-row">
+              <div class="master-status-item">
+                <span class="master-label">🎭 Senin Durumun:</span>
+                <span id="masterStatus" class="master-status-value">---</span>
+              </div>
+            </div>
+            
+            <div class="master-status-row">
+              <div class="master-status-item">
+                <span class="master-label">👑 Mevcut Master:</span>
+                <span id="currentMaster" class="master-current-value">---</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="master-control-actions">
+            <button id="masterToggleBtn" class="master-toggle-btn">
+              <span class="btn-icon">👑</span>
+              <span class="btn-text">Master Seç</span>
+            </button>
+          </div>
+          
+          <div class="master-info-box">
+            <div class="info-header">💡 Nasıl Çalışır?</div>
+            <div class="info-content">
+              <div class="info-item">
+                <span class="info-bullet">•</span>
+                <span class="info-text">Master kullanıcının video kontrolleri diğer kullanıcıları etkiler</span>
+              </div>
+              <div class="info-item">
+                <span class="info-bullet">•</span>
+                <span class="info-text">Follower kullanıcılar master'ı takip eder</span>
+              </div>
+              <div class="info-item">
+                <span class="info-bullet">•</span>
+                <span class="info-text">Butona tıklayarak master'ı değiştirebilirsiniz</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- ================== VİDEO SENKRONİZASYON DURUM BİLGİSİ ================== -->
+        <div id="video-sync-section" class="sync-section">
+          <div class="sync-header">
+            <h4>🎬 Video Senkronizasyon Durumu</h4>
+          </div>
+          
+          <!-- Sync Status Card -->
+          <div class="sync-status-card">
+            <div class="sync-status-row">
+              <span class="sync-label">📡 Durum:</span>
+              <span id="syncStatus" class="sync-value">⏸️ Senkronizasyon kapalı</span>
+            </div>
+          </div>
+          
+          <!-- Video Time Info -->
+          <div class="video-time-info">
+            <div class="time-display">
+              <div class="time-row user-time">
+                <div class="time-label">
+                  <span class="time-icon">📺</span>
+                  <span class="time-text">Senin video süren</span>
+                </div>
+                <div class="time-value-container">
+                  <span id="currentVideoTime" class="time-value">00:00</span>
+                </div>
+              </div>
+              
+              <div class="time-separator">
+                <div class="sync-arrow">⇅</div>
+              </div>
+              
+              <div class="time-row remote-time">
+                <div class="time-label">
+                  <span class="time-icon">👥</span>
+                  <span class="time-text">Master'ın video süresi</span>
+                </div>
+                <div class="time-value-container">
+                  <span id="remoteVideoTime" class="time-value">00:00</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
     
-    <!-- Chat Container (Başlangıçta Gizli) -->
-    <div id="chat-container" class="hidden">
-      <div class="chat-header">
-        <h3>Chat Odası</h3>
-        <button id="closeChatRoom" class="close-button">Kapat</button>
-      </div>
-      <p id="chatRoomInfo">Oda Kodu: <span id="currentChatCode">---</span></p>
-      
-      <!-- Mesajları Gösteren Alan -->
-      <div id="messages-container"></div>
+    <!-- ================== CHAT CONTAINER ================== -->
+    <div id="chat-container" class="tab-content hidden">
+      <div class="chat-wrapper">
+        
+        <!-- Chat Header -->
+        <div class="chat-header">
+          <div class="chat-title">
+            <h3>💬 Chat Odası</h3>
+            <div class="room-info">
+              <span class="room-code-label">Oda Kodu:</span>
+              <span id="currentChatCode" class="room-code-value">---</span>
+            </div>
+          </div>
+          <button id="closeChatRoom" class="close-button">
+            <span>✖️ Kapat</span>
+          </button>
+        </div>
+        
+        <!-- Messages Area -->
+        <div id="messages-container" class="messages-area">
+          <div class="messages-placeholder">
+            <div class="placeholder-icon">💬</div>
+            <p>Henüz mesaj yok. İlk mesajı sen gönder!</p>
+          </div>
+        </div>
 
-      <!-- Mesaj Yazma Alanı -->
-      <div id="message-box">
-        <input type="text" id="messageInput" placeholder="Mesajınızı yazın..." />
-        <button id="sendMessageBtn">Gönder</button>
+        <!-- Message Input Area -->
+        <div id="message-box" class="message-input-area">
+          <div class="input-wrapper">
+            <input 
+              type="text" 
+              id="messageInput" 
+              placeholder="Mesajınızı yazın..." 
+              class="message-input"
+              maxlength="500"
+            />
+            <button id="sendMessageBtn" class="send-btn">
+              <span>📤</span>
+            </button>
+          </div>
+          <div class="input-info">
+            <small class="char-count">0/500 karakter</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== LOADING INDICATOR ================== -->
+  <div id="loading-indicator" class="loading-overlay hidden">
+    <div class="loading-content">
+      <div class="spinner">
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+      </div>
+      <p class="loading-text">Yükleniyor...</p>
+    </div>
+  </div>
+
+  <!-- ================== NOTIFICATION SYSTEM ================== -->
+  <div id="notification-container" class="notification-container">
+    <!-- Bildirimler buraya dinamik olarak eklenecek -->
+  </div>
+
+  <!-- ================== MODAL DIALOGS ================== -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Bilgilendirme</h3>
+        <button class="modal-close">✖️</button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-message">Modal içeriği buraya gelecek</p>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-confirm" class="modal-btn primary">Tamam</button>
+        <button id="modal-cancel" class="modal-btn secondary">İptal</button>
       </div>
     </div>
   </div>
