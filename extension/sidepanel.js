@@ -1,7 +1,7 @@
-// ================== FINAL COMPLETE SİDEPANEL.JS v4 - CSP FIX ==================
+// ================== VIDEO SYNC APP v4 - ENGLISH VERSION ==================
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 Video Sync App v4 başlatılıyor...");
+  console.log("🚀 Video Sync App v4 starting...");
   
   // ================== GLOBAL STATE ==================
   
@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initialized: false
   };
   
-  // Master-Follower sistem
+  // Master-Follower system
   let masterSystem = {
     active: false,
     currentMaster: "",
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     heartbeatTimer: null
   };
   
-  // Video sync sistem
+  // Video sync system
   let videoSync = {
     active: false,
     roomRef: null,
@@ -36,14 +36,14 @@ document.addEventListener("DOMContentLoaded", () => {
     syncing: false
   };
   
-  // Chat sistem
+  // Chat system
   let chatSystem = {
     active: false,
     messagesRef: null,
     listener: null
   };
   
-  // WebRTC sistem
+  // WebRTC system
   let webrtcSystem = {
     localStream: null,
     remoteStream: null,
@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ================== DOM ELEMENTS ==================
   
   const elements = {
-    // Ana konteynerler
+    // Main containers
     loginScreen: document.getElementById("login-screen"),
     signupScreen: document.getElementById("signup-screen"),
     appContainer: document.getElementById("app-container"),
@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     currentVideoTime: document.getElementById("currentVideoTime"),
     remoteVideoTime: document.getElementById("remoteVideoTime"),
     
-    // Oda yönetimi
+    // Room management
     createVideoChatCodeBtn: document.getElementById("createVideoChatCodeBtn"),
     createChatCodeBtn: document.getElementById("createChatCodeBtn"),
     generatedVideoCode: document.getElementById("generatedVideoCode"),
@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     videoStatus: document.getElementById("videoStatus")
   };
   
-  // ================== FİREBASE SETUP - CSP UYUMLU ==================
+  // ================== FIREBASE SETUP - CSP COMPLIANT ==================
   
   const firebaseConfig = {
     apiKey: "AIzaSyB69u3UFUyEX0F237B7MKMRTm-mfSvEqJU",
@@ -153,9 +153,9 @@ document.addEventListener("DOMContentLoaded", () => {
   
   function initFirebase() {
     try {
-      // CSP uyumlu Firebase başlatma
+      // CSP compliant Firebase initialization
       if (typeof firebase === 'undefined') {
-        console.error("❌ Firebase SDK yüklenmedi");
+        console.error("❌ Firebase SDK not loaded");
         return false;
       }
       
@@ -163,35 +163,39 @@ document.addEventListener("DOMContentLoaded", () => {
         firebase.initializeApp(firebaseConfig);
       }
       
-      // Database referansını al
+      // Get database reference
       appState.database = firebase.database();
       
-      // CSP için özel ayarlar
+      // CSP specific settings
       if (appState.database) {
-        // Force WebSocket kullanımı (long polling yerine)
+        // Force WebSocket usage (instead of long polling)
         appState.database.goOnline();
         
-        console.log("✅ Firebase başlatıldı (CSP uyumlu)");
+        console.log("✅ Firebase initialized (CSP compliant)");
         return true;
       }
       
-      console.error("❌ Firebase database başlatılamadı");
+      console.error("❌ Firebase database could not be initialized");
       return false;
       
     } catch (error) {
-      console.error("❌ Firebase hatası:", error);
-      showMessage("Firebase bağlantı hatası!", true);
+      console.error("❌ Firebase error:", error);
+      showMessage("Firebase connection error!", true);
       return false;
     }
   }
   
-  // ================== UTILITY FONKSİYONLAR ==================
+  // ================== UTILITY FUNCTIONS ==================
   
   function showMessage(message, isError = false) {
     if (elements.statusEl) {
       elements.statusEl.textContent = message;
-      elements.statusEl.style.color = isError ? "#ff6b6b" : "#51cf66";
-      setTimeout(() => elements.statusEl.textContent = "", 5000);
+      elements.statusEl.style.color = isError ? "#ef4444" : "#10b981";
+      elements.statusEl.classList.remove("hidden");
+      setTimeout(() => {
+        elements.statusEl.textContent = "";
+        elements.statusEl.classList.add("hidden");
+      }, 5000);
     }
     console.log(isError ? "❌" : "✅", message);
   }
@@ -199,8 +203,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateSyncStatus(status) {
     if (elements.syncStatus) {
       elements.syncStatus.textContent = status;
-      elements.syncStatus.style.color = status.includes("❌") ? "#ff6b6b" : 
-                                        status.includes("✅") ? "#51cf66" : "#ffd43b";
+      elements.syncStatus.style.color = status.includes("❌") ? "#ef4444" : 
+                                        status.includes("✅") ? "#10b981" : "#f59e0b";
     }
   }
   
@@ -229,25 +233,25 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
-  // ================== PASSWORD VALİDATİON ==================
+  // ================== PASSWORD VALIDATION ==================
   
   function validatePassword(password) {
     const errors = [];
     
-    if (password.length < 12) {
-      errors.push("Şifre en az 12 karakter olmalıdır");
+    if (password.length < 8) {
+      errors.push("Password must be at least 8 characters long");
     }
     
     if (!/[A-Z]/.test(password)) {
-      errors.push("Şifre en az bir büyük harf içermelidir");
+      errors.push("Password must contain at least one uppercase letter");
     }
     
     if (!/[a-z]/.test(password)) {
-      errors.push("Şifre en az bir küçük harf içermelidir");
+      errors.push("Password must contain at least one lowercase letter");
     }
     
     if (!/[0-9]/.test(password)) {
-      errors.push("Şifre en az bir rakam içermelidir");
+      errors.push("Password must contain at least one number");
     }
     
     return {
@@ -273,16 +277,16 @@ document.addEventListener("DOMContentLoaded", () => {
         
         if (!validation.isValid) {
           elements.signupPasswordInput.setCustomValidity(validation.errors.join(", "));
-          errorElement.innerHTML = validation.errors.map(err => `<p style="color: orange; margin: 2px 0;">${err}</p>`).join("");
+          errorElement.innerHTML = validation.errors.map(err => `<p style="color: #f59e0b; margin: 2px 0;">${err}</p>`).join("");
         } else {
           elements.signupPasswordInput.setCustomValidity("");
-          errorElement.innerHTML = "<p style='color: green; margin: 2px 0;'>✓ Şifre gereksinimleri karşılandı</p>";
+          errorElement.innerHTML = "<p style='color: #10b981; margin: 2px 0;'>✓ Password requirements met</p>";
         }
       });
     }
   }
   
-  // ================== TAB NAVİGASYON ==================
+  // ================== TAB NAVIGATION ==================
   
   function initTabNavigation() {
     const navTabs = document.querySelectorAll('.nav-tab');
@@ -292,14 +296,14 @@ document.addEventListener("DOMContentLoaded", () => {
       tab.addEventListener('click', () => {
         const targetTab = tab.dataset.tab;
         
-        // Tüm tab'ları deactive yap
+        // Deactivate all tabs
         navTabs.forEach(t => t.classList.remove('active'));
         tabContents.forEach(content => content.classList.add('hidden'));
         
-        // Seçilen tab'ı aktif yap
+        // Activate selected tab
         tab.classList.add('active');
         
-        // İlgili içeriği göster
+        // Show related content
         switch(targetTab) {
           case 'rooms':
             if (elements.roomsSection) elements.roomsSection.classList.remove('hidden');
@@ -312,17 +316,17 @@ document.addEventListener("DOMContentLoaded", () => {
             break;
         }
         
-        console.log("📂 Tab değiştirildi:", targetTab);
+        console.log("📂 Tab switched:", targetTab);
       });
     });
     
-    console.log("📁 Tab navigation başlatıldı");
+    console.log("📁 Tab navigation initialized");
   }
   
-  // ================== AUTH SİSTEMİ ==================
+  // ================== AUTH SYSTEM ==================
   
   function initAuth() {
-    // Ekran geçişleri
+    // Screen transitions
     if (elements.showSignupLink) {
       elements.showSignupLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -339,35 +343,35 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    // Giriş
+    // Login
     if (elements.loginBtn) {
       elements.loginBtn.addEventListener("click", async () => {
         const email = elements.emailInput?.value?.trim();
         const password = elements.passwordInput?.value?.trim();
         
         if (!email || !password) {
-          showMessage("Email ve şifre gerekli!", true);
+          showMessage("Email and password are required!", true);
           return;
         }
         
-        showMessage("Giriş yapılıyor...");
+        showMessage("Signing in...");
         
         try {
           const response = await sendToBackground("login", { email, password });
           if (response.success) {
             appState.currentUser = response.nickname;
             showMainApp();
-            showMessage("Giriş başarılı!");
+            showMessage("Login successful!");
           } else {
-            showMessage("Giriş hatası: " + (response.error || "Bilinmeyen hata"), true);
+            showMessage("Login error: " + (response.error || "Unknown error"), true);
           }
         } catch (error) {
-          showMessage("Giriş hatası!", true);
+          showMessage("Login error!", true);
         }
       });
     }
     
-    // Kayıt
+    // Signup
     if (elements.signupBtn) {
       elements.signupBtn.addEventListener("click", async () => {
         const email = elements.signupEmailInput?.value?.trim();
@@ -375,61 +379,61 @@ document.addEventListener("DOMContentLoaded", () => {
         const nickname = elements.nicknameInput?.value?.trim();
         
         if (!email || !password || !nickname) {
-          showMessage("Tüm alanlar gerekli!", true);
+          showMessage("All fields are required!", true);
           return;
         }
         
         const validation = validatePassword(password);
         if (!validation.isValid) {
-          showMessage("Şifre gereksinimleri: " + validation.errors.join(", "), true);
+          showMessage("Password requirements: " + validation.errors.join(", "), true);
           return;
         }
         
-        showMessage("Kayıt oluşturuluyor...");
+        showMessage("Creating account...");
         
         try {
           const response = await sendToBackground("signup", { email, password, nickname });
           if (response.success) {
-            showMessage("Kayıt başarılı! Giriş yapabilirsiniz.");
+            showMessage("Registration successful! You can now sign in.");
             if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
             if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
           } else {
-            showMessage("Kayıt hatası: " + (response.error || "Bilinmeyen hata"), true);
+            showMessage("Registration error: " + (response.error || "Unknown error"), true);
           }
         } catch (error) {
-          showMessage("Kayıt hatası!", true);
+          showMessage("Registration error!", true);
         }
       });
     }
     
-    // Google giriş
+    // Google login
     if (elements.googleLoginBtn) {
       elements.googleLoginBtn.addEventListener("click", async () => {
-        showMessage("Google ile giriş yapılıyor...");
+        showMessage("Signing in with Google...");
         
         try {
           const response = await sendToBackground("googleLogin");
           if (response.success) {
             appState.currentUser = response.nickname;
             showMainApp();
-            showMessage("Google giriş başarılı!");
+            showMessage("Google login successful!");
           } else {
-            showMessage("Google giriş hatası!", true);
+            showMessage("Google login error!", true);
           }
         } catch (error) {
-          showMessage("Google giriş hatası!", true);
+          showMessage("Google login error!", true);
         }
       });
     }
     
-    // Çıkış
+    // Logout
     if (elements.logoutBtn) {
       elements.logoutBtn.addEventListener("click", () => {
         performLogout();
       });
     }
     
-    console.log("🔐 Auth sistemi başlatıldı");
+    console.log("🔐 Auth system initialized");
   }
   
   function showMainApp() {
@@ -438,9 +442,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.appContainer) elements.appContainer.classList.remove("hidden");
     
     const welcomeMsg = document.getElementById("welcomeMsg");
-    if (welcomeMsg) welcomeMsg.textContent = `Merhaba, ${appState.currentUser}`;
+    if (welcomeMsg) welcomeMsg.textContent = `Hello, ${appState.currentUser}`;
     
-    // İlk tab'ı aktif yap
+    // Activate first tab
     const firstTab = document.querySelector('.nav-tab');
     if (firstTab) firstTab.click();
   }
@@ -452,17 +456,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.appContainer) elements.appContainer.classList.add("hidden");
     if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
     
-    // Form'ları temizle
+    // Clear forms
     if (elements.emailInput) elements.emailInput.value = "";
     if (elements.passwordInput) elements.passwordInput.value = "";
     
-    showMessage("Çıkış yapıldı.");
+    showMessage("Logged out successfully.");
   }
   
   async function sendToBackground(action, data = {}) {
     return new Promise((resolve) => {
       if (typeof chrome === 'undefined' || !chrome.runtime) {
-        resolve({ success: false, error: "Chrome runtime yok" });
+        resolve({ success: false, error: "Chrome runtime not available" });
         return;
       }
       
@@ -476,10 +480,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // ================== ODA YÖNETİMİ ==================
+  // ================== ROOM MANAGEMENT ==================
   
   function initRoomManagement() {
-    // Video kodu oluştur
+    // Create video code
     if (elements.createVideoChatCodeBtn) {
       elements.createVideoChatCodeBtn.addEventListener("click", async () => {
         const code = generateCode();
@@ -491,14 +495,14 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = code;
           if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.remove("hidden");
-          showMessage("Video kodu oluşturuldu: " + code);
+          showMessage("Video room code created: " + code);
         } catch (error) {
-          showMessage("Kod oluşturma hatası!", true);
+          showMessage("Code creation error!", true);
         }
       });
     }
     
-    // Chat kodu oluştur
+    // Create chat code
     if (elements.createChatCodeBtn) {
       elements.createChatCodeBtn.addEventListener("click", async () => {
         const code = generateCode();
@@ -510,19 +514,19 @@ document.addEventListener("DOMContentLoaded", () => {
           
           if (elements.generatedChatCode) elements.generatedChatCode.textContent = code;
           if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.remove("hidden");
-          showMessage("Chat kodu oluşturuldu: " + code);
+          showMessage("Chat room code created: " + code);
         } catch (error) {
-          showMessage("Kod oluşturma hatası!", true);
+          showMessage("Code creation error!", true);
         }
       });
     }
     
-    // Kod kopyalama
+    // Copy codes
     if (elements.copyVideoCodeBtn) {
       elements.copyVideoCodeBtn.addEventListener("click", () => {
         const code = elements.generatedVideoCode?.textContent;
         if (code && code !== "-") {
-          copyToClipboard(code, "Video kodu kopyalandı!");
+          copyToClipboard(code, "Video code copied!");
         }
       });
     }
@@ -531,17 +535,17 @@ document.addEventListener("DOMContentLoaded", () => {
       elements.copyChatCodeBtn.addEventListener("click", () => {
         const code = elements.generatedChatCode?.textContent;
         if (code && code !== "-") {
-          copyToClipboard(code, "Chat kodu kopyalandı!");
+          copyToClipboard(code, "Chat code copied!");
         }
       });
     }
     
-    // Video odasına katıl
+    // Join video room
     if (elements.joinVideoRoomBtn) {
       elements.joinVideoRoomBtn.addEventListener("click", async () => {
         const code = elements.videoCodeInput?.value?.trim();
         if (!code) {
-          showMessage("Video kodu girin!", true);
+          showMessage("Please enter a video room code!", true);
           return;
         }
         
@@ -552,30 +556,30 @@ document.addEventListener("DOMContentLoaded", () => {
             if (elements.currentVideoCode) elements.currentVideoCode.textContent = code;
             if (elements.videoContainer) elements.videoContainer.classList.remove("hidden");
             
-            // Video tab'ına geç
+            // Switch to video tab
             const videoTab = document.querySelector('.nav-tab[data-tab="video"]');
             if (videoTab) videoTab.click();
             
-            // Sistemleri başlat
+            // Start systems
             await startMasterFollowerSystem(code);
             await startVideoSync(code);
             
-            showMessage("Video odasına katılındı!");
+            showMessage("Joined video room!");
           } else {
-            showMessage("Geçersiz video kodu!", true);
+            showMessage("Invalid video room code!", true);
           }
         } catch (error) {
-          showMessage("Oda katılma hatası!", true);
+          showMessage("Room join error!", true);
         }
       });
     }
     
-    // Chat odasına katıl
+    // Join chat room
     if (elements.joinChatRoomBtn) {
       elements.joinChatRoomBtn.addEventListener("click", async () => {
         const code = elements.chatCodeInput?.value?.trim();
         if (!code) {
-          showMessage("Chat kodu girin!", true);
+          showMessage("Please enter a chat room code!", true);
           return;
         }
         
@@ -586,22 +590,22 @@ document.addEventListener("DOMContentLoaded", () => {
             if (elements.currentChatCode) elements.currentChatCode.textContent = code;
             if (elements.chatContainer) elements.chatContainer.classList.remove("hidden");
             
-            // Chat tab'ına geç
+            // Switch to chat tab
             const chatTab = document.querySelector('.nav-tab[data-tab="chat"]');
             if (chatTab) chatTab.click();
             
             startChatSystem(code);
-            showMessage("Chat odasına katılındı!");
+            showMessage("Joined chat room!");
           } else {
-            showMessage("Geçersiz chat kodu!", true);
+            showMessage("Invalid chat room code!", true);
           }
         } catch (error) {
-          showMessage("Chat katılma hatası!", true);
+          showMessage("Chat join error!", true);
         }
       });
     }
     
-    // Odaları kapat
+    // Close rooms
     if (elements.closeVideoChat) {
       elements.closeVideoChat.addEventListener("click", () => {
         stopVideoSync();
@@ -613,11 +617,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
         if (elements.videoCodeInput) elements.videoCodeInput.value = "";
         
-        // Rooms tab'ına dön
+        // Return to rooms tab
         const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
         if (roomsTab) roomsTab.click();
         
-        showMessage("Video odası kapatıldı.");
+        showMessage("Video room closed.");
       });
     }
     
@@ -630,15 +634,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
         if (elements.chatCodeInput) elements.chatCodeInput.value = "";
         
-        // Rooms tab'ına dön
+        // Return to rooms tab
         const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
         if (roomsTab) roomsTab.click();
         
-        showMessage("Chat odası kapatıldı.");
+        showMessage("Chat room closed.");
       });
     }
     
-    console.log("🏠 Oda yönetimi başlatıldı");
+    console.log("🏠 Room management initialized");
   }
   
   function copyToClipboard(text, successMessage) {
@@ -663,17 +667,17 @@ document.addEventListener("DOMContentLoaded", () => {
     showMessage(successMessage);
   }
   
-  // ================== MASTER-FOLLOWER SİSTEMİ ==================
+  // ================== MASTER-FOLLOWER SYSTEM ==================
   
   async function startMasterFollowerSystem(roomId) {
-    console.log("👑 Master-Follower sistem başlatılıyor...");
+    console.log("👑 Starting Master-Follower system...");
     
     try {
       masterSystem.active = true;
       masterSystem.roomRef = appState.database.ref(`masterControl/${roomId}/currentMaster`);
       masterSystem.usersRef = appState.database.ref(`masterControl/${roomId}/users`);
       
-      // Kullanıcıyı kaydet
+      // Register user
       await masterSystem.usersRef.child(appState.currentUser).set({
         nickname: appState.currentUser,
         online: true,
@@ -683,7 +687,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Disconnect handler
       masterSystem.usersRef.child(appState.currentUser).onDisconnect().remove();
       
-      // Master değişikliklerini dinle
+      // Listen for master changes
       masterSystem.listener = masterSystem.roomRef.on('value', (snapshot) => {
         const newMaster = snapshot.val();
         
@@ -692,22 +696,22 @@ document.addEventListener("DOMContentLoaded", () => {
           masterSystem.iAmMaster = (newMaster === appState.currentUser);
           updateMasterUI();
           
-          console.log("👑 Master:", newMaster, "Ben master:", masterSystem.iAmMaster);
+          console.log("👑 Master:", newMaster, "Am I master:", masterSystem.iAmMaster);
         } else if (!masterSystem.currentMaster) {
-          // İlk katılan master olur
+          // First joiner becomes master
           setMaster(appState.currentUser);
         }
       });
       
-      // Heartbeat başlat
+      // Start heartbeat
       startHeartbeat();
       
       updateMasterUI();
-      console.log("✅ Master-Follower sistem başlatıldı");
+      console.log("✅ Master-Follower system started");
       
     } catch (error) {
-      console.error("❌ Master-Follower başlatma hatası:", error);
-      showMessage("Master sistem hatası!", true);
+      console.error("❌ Master-Follower startup error:", error);
+      showMessage("Master system error!", true);
     }
   }
   
@@ -720,24 +724,24 @@ document.addEventListener("DOMContentLoaded", () => {
             online: true
           });
         } catch (error) {
-          console.error("Heartbeat hatası:", error);
+          console.error("Heartbeat error:", error);
         }
       }
-    }, 5000); // Her 5 saniyede bir heartbeat
+    }, 5000); // Every 5 seconds
   }
   
   async function setMaster(nickname) {
     try {
       await masterSystem.roomRef.set(nickname);
-      console.log("👑 Master ayarlandı:", nickname);
+      console.log("👑 Master set:", nickname);
     } catch (error) {
-      console.error("Master ayarlama hatası:", error);
+      console.error("Master setting error:", error);
     }
   }
   
   function updateMasterUI() {
     if (elements.masterStatus) {
-      elements.masterStatus.textContent = masterSystem.iAmMaster ? "👑 SEN MASTER'SIN" : "👤 Follower";
+      elements.masterStatus.textContent = masterSystem.iAmMaster ? "👑 YOU ARE MASTER" : "👤 Follower";
       elements.masterStatus.style.color = masterSystem.iAmMaster ? "#ffd700" : "#888";
       elements.masterStatus.style.fontWeight = masterSystem.iAmMaster ? "bold" : "normal";
     }
@@ -749,19 +753,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.masterToggleBtn) {
       elements.masterToggleBtn.innerHTML = `
         <span class="btn-icon">👑</span>
-        <span class="btn-text">Master Değiştir</span>
+        <span class="btn-text">Switch Master</span>
       `;
     }
     
-    // Master değişince follower timer'ını yeniden başlat
+    // When master changes, restart follower timer
     if (videoSync.active) {
-      // Önceki follower timer'ını temizle
+      // Clear previous follower timer
       if (videoSync.followerTimer) {
         clearInterval(videoSync.followerTimer);
         videoSync.followerTimer = null;
       }
       
-      // Eğer artık follower'sam, timer başlat
+      // If I'm now a follower, start timer
       if (!masterSystem.iAmMaster) {
         videoSync.followerTimer = setInterval(async () => {
           if (!videoSync.active) return;
@@ -781,7 +785,7 @@ document.addEventListener("DOMContentLoaded", () => {
               await videoSync.myRef.set(data);
             }
           } catch (error) {
-            console.error("Follower durum paylaşım hatası:", error);
+            console.error("Follower state sharing error:", error);
           }
         }, 3000);
       }
@@ -809,11 +813,11 @@ document.addEventListener("DOMContentLoaded", () => {
       masterSystem.currentMaster = "";
       masterSystem.iAmMaster = false;
       
-      // UI sıfırla
+      // Reset UI
       if (elements.masterStatus) elements.masterStatus.textContent = "---";
       if (elements.currentMaster) elements.currentMaster.textContent = "---";
       
-      console.log("🛑 Master-Follower sistem durduruldu");
+      console.log("🛑 Master-Follower system stopped");
     }
   }
   
@@ -822,7 +826,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.masterToggleBtn) {
       elements.masterToggleBtn.addEventListener("click", async () => {
         if (!masterSystem.active) {
-          showMessage("Master sistem aktif değil!", true);
+          showMessage("Master system not active!", true);
           return;
         }
         
@@ -832,7 +836,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const onlineUsers = Object.keys(users).filter(user => users[user].online);
           
           if (onlineUsers.length < 2) {
-            showMessage("En az 2 kullanıcı gerekli!", true);
+            showMessage("At least 2 users required!", true);
             return;
           }
           
@@ -841,26 +845,26 @@ document.addEventListener("DOMContentLoaded", () => {
           const nextMaster = onlineUsers[nextIndex];
           
           await setMaster(nextMaster);
-          showMessage(`Master değiştirildi: ${nextMaster}`);
+          showMessage(`Master changed to: ${nextMaster}`);
         } catch (error) {
-          console.error("Master değiştirme hatası:", error);
-          showMessage("Master değiştirme hatası!", true);
+          console.error("Master switching error:", error);
+          showMessage("Master switching error!", true);
         }
       });
     }
   }
   
-  // ================== VİDEO SYNC SİSTEMİ ==================
+  // ================== VIDEO SYNC SYSTEM ==================
   
   async function startVideoSync(roomId) {
-    console.log("🎬 Video sync başlatılıyor...");
+    console.log("🎬 Starting video sync...");
     
     try {
       videoSync.active = true;
       videoSync.roomRef = appState.database.ref(`videoSync/${roomId}/states`);
       videoSync.myRef = videoSync.roomRef.child(appState.currentUser);
       
-      // Master durum paylaşımı
+      // Master state sharing
       videoSync.updateTimer = setInterval(async () => {
         if (!videoSync.active || !masterSystem.iAmMaster || videoSync.syncing) return;
         
@@ -875,7 +879,7 @@ document.addEventListener("DOMContentLoaded", () => {
               isMaster: true
             };
             
-            // Önceki durumla karşılaştır
+            // Compare with previous state
             if (!videoSync.lastState || 
                 Math.abs(data.currentTime - videoSync.lastState.currentTime) > 1 ||
                 data.paused !== videoSync.lastState.paused ||
@@ -885,15 +889,15 @@ document.addEventListener("DOMContentLoaded", () => {
               videoSync.lastState = data;
               updateVideoTimes(data.currentTime, 0);
               
-              console.log("📤 Master durumu gönderildi:", data.currentTime, data.paused);
+              console.log("📤 Master state sent:", data.currentTime, data.paused);
             }
           }
         } catch (error) {
-          console.error("Video sync paylaşım hatası:", error);
+          console.error("Video sync sharing error:", error);
         }
       }, 2000);
       
-      // Follower dinleme
+      // Follower listening
       videoSync.listener = videoSync.roomRef.on('value', (snapshot) => {
         if (!snapshot.exists() || videoSync.syncing) return;
         
@@ -901,13 +905,13 @@ document.addEventListener("DOMContentLoaded", () => {
           const states = snapshot.val();
           
           if (masterSystem.iAmMaster) {
-            // Master: Sadece kendi durumunu göster
+            // Master: Only show own state
             const myState = states[appState.currentUser];
             if (myState) {
               updateVideoTimes(myState.currentTime, 0);
             }
           } else {
-            // Follower: Hem master'ı hem kendini göster
+            // Follower: Show both master and self
             const masterState = Object.values(states || {}).find(state => 
               state.isMaster && state.nickname !== appState.currentUser
             );
@@ -923,11 +927,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         } catch (error) {
-          console.error("Video sync dinleme hatası:", error);
+          console.error("Video sync listening error:", error);
         }
       });
       
-      // Follower'lar da kendi durumlarını paylaşır (sadece görüntü için)
+      // Followers also share their state (for display only)
       if (!masterSystem.iAmMaster) {
         videoSync.followerTimer = setInterval(async () => {
           if (!videoSync.active) return;
@@ -947,17 +951,17 @@ document.addEventListener("DOMContentLoaded", () => {
               await videoSync.myRef.set(data);
             }
           } catch (error) {
-            console.error("Follower durum paylaşım hatası:", error);
+            console.error("Follower state sharing error:", error);
           }
-        }, 3000); // Follower'lar 3 saniyede bir günceller
+        }, 3000); // Followers update every 3 seconds
       }
       
-      updateSyncStatus("🎬 Video sync aktif");
-      console.log("✅ Video sync başlatıldı");
+      updateSyncStatus("🎬 Video sync active");
+      console.log("✅ Video sync started");
       
     } catch (error) {
-      console.error("❌ Video sync başlatma hatası:", error);
-      updateSyncStatus("❌ Video sync hatası");
+      console.error("❌ Video sync startup error:", error);
+      updateSyncStatus("❌ Video sync error");
     }
   }
   
@@ -973,18 +977,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
       const pauseDiff = myState.paused !== masterState.paused;
       
-      console.log("🔍 Sync kontrol:", {
+      console.log("🔍 Sync check:", {
         myTime: myState.currentTime,
         masterTime: masterState.currentTime,
         timeDiff: timeDiff.toFixed(1),
         pauseDiff
       });
       
-      if (timeDiff > 3 || pauseDiff) {
-        console.log("🔄 Master'a senkronize oluyor...");
-        updateSyncStatus("🔄 Senkronize ediliyor...");
+      if (timeDiff > 2 || pauseDiff) {
+        console.log("🔄 Syncing to master...");
+        updateSyncStatus("🔄 Synchronizing...");
         
-        // Pause/play durumunu ayarla
+        // Set pause/play state
         if (pauseDiff) {
           if (masterState.paused && !myState.paused) {
             await executeVideoAction('pauseVideo');
@@ -995,21 +999,21 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
         
-        // Zaman farkını ayarla
+        // Set time difference
         if (timeDiff > 3) {
           await executeVideoAction('setVideoTime', masterState.currentTime);
           await sleep(500);
         }
         
-        updateSyncStatus("✅ Senkronize edildi");
-        console.log("✅ Senkronizasyon tamamlandı");
+        updateSyncStatus("✅ Synchronized");
+        console.log("✅ Synchronization complete");
         
       } else {
-        updateSyncStatus("✅ Senkron - " + timeDiff.toFixed(1) + "s fark");
+        updateSyncStatus("✅ In Sync - " + timeDiff.toFixed(1) + "s diff");
       }
     } catch (error) {
-      console.error("Sync hatası:", error);
-      updateSyncStatus("❌ Sync hatası");
+      console.error("Sync error:", error);
+      updateSyncStatus("❌ Sync error");
     } finally {
       setTimeout(() => {
         videoSync.syncing = false;
@@ -1020,7 +1024,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function getVideoState() {
     return new Promise((resolve) => {
       if (typeof chrome === 'undefined' || !chrome.runtime) {
-        resolve({ success: false, error: "Chrome runtime yok" });
+        resolve({ success: false, error: "Chrome runtime not available" });
         return;
       }
       
@@ -1046,7 +1050,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
       chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
-          console.error(`Video action ${action} hatası:`, chrome.runtime.lastError);
+          console.error(`Video action ${action} error:`, chrome.runtime.lastError);
           resolve(false);
         } else {
           resolve(response?.success || false);
@@ -1081,23 +1085,23 @@ document.addEventListener("DOMContentLoaded", () => {
       videoSync.lastState = null;
       videoSync.syncing = false;
       
-      updateSyncStatus("⏸️ Video sync durduruldu");
+      updateSyncStatus("⏸️ Video sync stopped");
       updateVideoTimes(0, 0);
       
-      console.log("🛑 Video sync durduruldu");
+      console.log("🛑 Video sync stopped");
     }
   }
   
-  // ================== CHAT SİSTEMİ ==================
+  // ================== CHAT SYSTEM ==================
   
   function startChatSystem(roomId) {
-    console.log("💬 Chat sistemi başlatılıyor...");
+    console.log("💬 Starting chat system...");
     
     try {
       chatSystem.active = true;
       chatSystem.messagesRef = appState.database.ref(`chatMessages/${roomId}`);
       
-      // Mesajları dinle
+      // Listen for messages
       chatSystem.listener = chatSystem.messagesRef.on("value", (snapshot) => {
         if (elements.messagesContainer) {
           elements.messagesContainer.innerHTML = "";
@@ -1113,24 +1117,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
       
-      // Mesaj gönderme
+      // Setup message sending
       setupMessageSending();
       
-      console.log("✅ Chat sistemi başlatıldı");
+      console.log("✅ Chat system started");
       
     } catch (error) {
-      console.error("❌ Chat başlatma hatası:", error);
-      showMessage("Chat sistem hatası!", true);
+      console.error("❌ Chat startup error:", error);
+      showMessage("Chat system error!", true);
     }
   }
   
   function setupMessageSending() {
-    // Send butonu
+    // Send button
     if (elements.sendMessageBtn) {
       elements.sendMessageBtn.onclick = sendMessage;
     }
     
-    // Enter tuşu
+    // Enter key
     if (elements.messageInput) {
       elements.messageInput.onkeypress = (e) => {
         if (e.key === "Enter") {
@@ -1155,8 +1159,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (elements.messageInput) elements.messageInput.value = "";
       
     } catch (error) {
-      console.error("Mesaj gönderme hatası:", error);
-      showMessage("Mesaj gönderme hatası!", true);
+      console.error("Message sending error:", error);
+      showMessage("Message sending error!", true);
     }
   }
   
@@ -1167,8 +1171,8 @@ document.addEventListener("DOMContentLoaded", () => {
     messageEl.textContent = `${message.sender}: ${message.text}`;
     messageEl.className = message.sender === appState.currentUser ? "sent-message" : "received-message";
     
-    // Kullanıcı rengi
-    const colors = ["#8E44AD", "#C0392B", "#D35400", "#27AE60", "#2980B9"];
+    // User color
+    const colors = ["#8b5cf6", "#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
     const colorIndex = message.sender.charCodeAt(0) % colors.length;
     messageEl.style.backgroundColor = colors[colorIndex];
     
@@ -1194,19 +1198,19 @@ document.addEventListener("DOMContentLoaded", () => {
         elements.messagesContainer.innerHTML = "";
       }
       
-      console.log("🛑 Chat sistemi durduruldu");
+      console.log("🛑 Chat system stopped");
     }
   }
   
-  // ================== WEBRTC VİDEO CHAT ==================
+  // ================== WEBRTC VIDEO CHAT ==================
   
   function initWebRTC() {
     if (!elements.startButton || !elements.hangupButton) return;
     
-    // Start butonu
+    // Start button
     elements.startButton.onclick = async () => {
       try {
-        updateVideoStatus("Kamera açılıyor...");
+        updateVideoStatus("Starting camera...");
         
         webrtcSystem.localStream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -1221,27 +1225,27 @@ document.addEventListener("DOMContentLoaded", () => {
         elements.startButton.disabled = true;
         elements.hangupButton.disabled = false;
         
-        updateVideoStatus("Görüşme başlatıldı");
+        updateVideoStatus("Call started");
         updateMediaButtons();
         
-        // WebRTC signaling başlat
+        // Start WebRTC signaling
         if (appState.currentVideoRoom) {
           await setupWebRTCSignaling(appState.currentVideoRoom);
         }
         
       } catch (error) {
-        console.error("Kamera başlatma hatası:", error);
-        updateVideoStatus("Kamera/mikrofon erişim hatası: " + error.message);
+        console.error("Camera startup error:", error);
+        updateVideoStatus("Camera/microphone access error: " + error.message);
         elements.startButton.disabled = false;
       }
     };
     
-    // Hangup butonu
+    // Hangup button
     elements.hangupButton.onclick = () => {
       stopWebRTC();
     };
     
-    // Kamera toggle
+    // Camera toggle
     if (elements.cameraToggle) {
       elements.cameraToggle.onclick = () => {
         if (webrtcSystem.localStream) {
@@ -1250,13 +1254,13 @@ document.addEventListener("DOMContentLoaded", () => {
             webrtcSystem.isCameraOn = !webrtcSystem.isCameraOn;
             videoTrack.enabled = webrtcSystem.isCameraOn;
             updateMediaButtons();
-            updateVideoStatus(webrtcSystem.isCameraOn ? "Kamera açıldı" : "Kamera kapatıldı");
+            updateVideoStatus(webrtcSystem.isCameraOn ? "Camera on" : "Camera off");
           }
         }
       };
     }
     
-    // Mikrofon toggle
+    // Microphone toggle
     if (elements.micToggle) {
       elements.micToggle.onclick = () => {
         if (webrtcSystem.localStream) {
@@ -1265,61 +1269,61 @@ document.addEventListener("DOMContentLoaded", () => {
             webrtcSystem.isMicOn = !webrtcSystem.isMicOn;
             audioTrack.enabled = webrtcSystem.isMicOn;
             updateMediaButtons();
-            updateVideoStatus(webrtcSystem.isMicOn ? "Mikrofon açıldı" : "Mikrofon kapatıldı");
+            updateVideoStatus(webrtcSystem.isMicOn ? "Microphone on" : "Microphone off");
           }
         }
       };
     }
     
-    console.log("📹 WebRTC başlatıldı");
+    console.log("📹 WebRTC initialized");
   }
   
   async function setupWebRTCSignaling(roomId) {
     try {
       webrtcSystem.roomRef = appState.database.ref(`webrtcRooms/${roomId}`);
       
-      // Oda var mı kontrol et
+      // Check if room exists
       const roomSnapshot = await webrtcSystem.roomRef.once('value');
       
       if (!roomSnapshot.exists()) {
-        // Oda oluştur (caller)
+        // Create room (caller)
         await createWebRTCRoom();
       } else {
-        // Odaya katıl (callee)
+        // Join room (callee)
         await joinWebRTCRoom();
       }
       
     } catch (error) {
-      console.error("WebRTC signaling hatası:", error);
-      updateVideoStatus("Bağlantı hatası: " + error.message);
+      console.error("WebRTC signaling error:", error);
+      updateVideoStatus("Connection error: " + error.message);
     }
   }
   
   async function createWebRTCRoom() {
     try {
-      updateVideoStatus("Oda oluşturuluyor...");
+      updateVideoStatus("Creating room...");
       
       webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
       setupPeerConnectionEvents();
       
-      // Local stream'i ekle
+      // Add local stream
       if (webrtcSystem.localStream) {
         webrtcSystem.localStream.getTracks().forEach(track => {
           webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
         });
       }
       
-      // ICE candidates'ı önce başlat
+      // Start ICE candidates first
       collectICECandidates('caller', 'callee');
       
-      // Offer oluştur
+      // Create offer
       const offer = await webrtcSystem.peerConnection.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
       await webrtcSystem.peerConnection.setLocalDescription(offer);
       
-      // Firebase'e kaydet
+      // Save to Firebase
       await webrtcSystem.roomRef.set({
         offer: {
           type: offer.type,
@@ -1328,63 +1332,63 @@ document.addEventListener("DOMContentLoaded", () => {
         created: Date.now()
       });
       
-      // Answer'ı dinle
+      // Listen for answer
       webrtcSystem.roomRef.on('value', async (snapshot) => {
         const data = snapshot.val();
         if (data?.answer && webrtcSystem.peerConnection.signalingState === 'have-local-offer') {
           try {
             const answer = new RTCSessionDescription(data.answer);
             await webrtcSystem.peerConnection.setRemoteDescription(answer);
-            updateVideoStatus("Yanıt alındı, bağlanıyor...");
+            updateVideoStatus("Answer received, connecting...");
           } catch (error) {
-            console.error("Answer işleme hatası:", error);
-            updateVideoStatus("Bağlantı hatası");
+            console.error("Answer processing error:", error);
+            updateVideoStatus("Connection error");
           }
         }
       });
       
-      updateVideoStatus("Katılımcı bekleniyor...");
+      updateVideoStatus("Waiting for participant...");
       
     } catch (error) {
-      console.error("Oda oluşturma hatası:", error);
-      updateVideoStatus("Oda oluşturma hatası: " + error.message);
+      console.error("Room creation error:", error);
+      updateVideoStatus("Room creation error: " + error.message);
     }
   }
   
   async function joinWebRTCRoom() {
     try {
-      updateVideoStatus("Odaya katılınıyor...");
+      updateVideoStatus("Joining room...");
       
       const roomSnapshot = await webrtcSystem.roomRef.once('value');
       const roomData = roomSnapshot.val();
       
       if (!roomData?.offer) {
-        updateVideoStatus("Geçersiz oda");
+        updateVideoStatus("Invalid room");
         return;
       }
       
       webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
       setupPeerConnectionEvents();
       
-      // Local stream'i ekle
+      // Add local stream
       if (webrtcSystem.localStream) {
         webrtcSystem.localStream.getTracks().forEach(track => {
           webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
         });
       }
       
-      // ICE candidates'ı önce başlat
+      // Start ICE candidates first
       collectICECandidates('callee', 'caller');
       
-      // Remote description ayarla
+      // Set remote description
       const offer = new RTCSessionDescription(roomData.offer);
       await webrtcSystem.peerConnection.setRemoteDescription(offer);
       
-      // Answer oluştur
+      // Create answer
       const answer = await webrtcSystem.peerConnection.createAnswer();
       await webrtcSystem.peerConnection.setLocalDescription(answer);
       
-      // Answer'ı Firebase'e kaydet
+      // Save answer to Firebase
       await webrtcSystem.roomRef.update({
         answer: {
           type: answer.type,
@@ -1392,11 +1396,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
       
-      updateVideoStatus("Bağlanıyor...");
+      updateVideoStatus("Connecting...");
       
     } catch (error) {
-      console.error("Oda katılma hatası:", error);
-      updateVideoStatus("Oda katılma hatası: " + error.message);
+      console.error("Room join error:", error);
+      updateVideoStatus("Room join error: " + error.message);
     }
   }
   
@@ -1411,7 +1415,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Track events
     webrtcSystem.peerConnection.ontrack = (event) => {
-      console.log("Remote track alındı");
+      console.log("Remote track received");
       event.streams[0].getTracks().forEach(track => {
         webrtcSystem.remoteStream.addTrack(track);
       });
@@ -1420,17 +1424,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // Connection state
     webrtcSystem.peerConnection.onconnectionstatechange = () => {
       const state = webrtcSystem.peerConnection.connectionState;
-      console.log("Bağlantı durumu:", state);
+      console.log("Connection state:", state);
       
       switch (state) {
         case 'connected':
-          updateVideoStatus("Bağlandı! Görüşme aktif.");
+          updateVideoStatus("Connected! Call is active.");
           break;
         case 'disconnected':
-          updateVideoStatus("Bağlantı kesildi");
+          updateVideoStatus("Connection lost");
           break;
         case 'failed':
-          updateVideoStatus("Bağlantı başarısız");
+          updateVideoStatus("Connection failed");
           break;
       }
     };
@@ -1440,33 +1444,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const localCandidatesRef = webrtcSystem.roomRef.child(`${localName}Candidates`);
     const remoteCandidatesRef = webrtcSystem.roomRef.child(`${remoteName}Candidates`);
     
-    // Local ICE candidates'ı gönder
+    // Send local ICE candidates
     webrtcSystem.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`📡 ${localName} ICE candidate gönderiliyor`);
+        console.log(`📡 ${localName} ICE candidate sending`);
         localCandidatesRef.push(event.candidate.toJSON()).catch(error => {
-          console.error("ICE candidate gönderme hatası:", error);
+          console.error("ICE candidate sending error:", error);
         });
       }
     };
     
-    // Remote ICE candidates'ı dinle
+    // Listen for remote ICE candidates
     remoteCandidatesRef.on('child_added', async (snapshot) => {
       const candidateData = snapshot.val();
-      console.log(`📡 ${remoteName} ICE candidate alındı`);
+      console.log(`📡 ${remoteName} ICE candidate received`);
       
       try {
         const candidate = new RTCIceCandidate(candidateData);
         await webrtcSystem.peerConnection.addIceCandidate(candidate);
-        console.log(`✅ ${remoteName} ICE candidate eklendi`);
+        console.log(`✅ ${remoteName} ICE candidate added`);
       } catch (error) {
-        console.error(`❌ ${remoteName} ICE candidate ekleme hatası:`, error);
+        console.error(`❌ ${remoteName} ICE candidate add error:`, error);
       }
     });
   }
   
   function updateMediaButtons() {
-    // Kamera butonu
+    // Camera button
     if (elements.cameraToggle) {
       const cameraOn = elements.cameraToggle.querySelector('.camera-on');
       const cameraOff = elements.cameraToggle.querySelector('.camera-off');
@@ -1486,7 +1490,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Mikrofon butonu
+    // Microphone button
     if (elements.micToggle) {
       const micOn = elements.micToggle.querySelector('.mic-on');
       const micOff = elements.micToggle.querySelector('.mic-off');
@@ -1515,7 +1519,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   function stopWebRTC() {
-    // Streams'i durdur
+    // Stop streams
     if (webrtcSystem.localStream) {
       webrtcSystem.localStream.getTracks().forEach(track => track.stop());
       webrtcSystem.localStream = null;
@@ -1526,91 +1530,91 @@ document.addEventListener("DOMContentLoaded", () => {
       webrtcSystem.remoteStream = null;
     }
     
-    // Peer connection'ı kapat
+    // Close peer connection
     if (webrtcSystem.peerConnection) {
       webrtcSystem.peerConnection.close();
       webrtcSystem.peerConnection = null;
     }
     
-    // Firebase listener'ları temizle
+    // Clean Firebase listeners
     if (webrtcSystem.roomRef) {
       webrtcSystem.roomRef.off();
       webrtcSystem.roomRef = null;
     }
     
-    // Video elementlerini temizle
+    // Clear video elements
     if (elements.localVideo) elements.localVideo.srcObject = null;
     if (elements.remoteVideo) elements.remoteVideo.srcObject = null;
     
-    // Butonları sıfırla
+    // Reset buttons
     if (elements.startButton) elements.startButton.disabled = false;
     if (elements.hangupButton) elements.hangupButton.disabled = true;
     
     webrtcSystem.isCameraOn = true;
     webrtcSystem.isMicOn = true;
     
-    updateVideoStatus("Görüşme sonlandırıldı");
-    console.log("🛑 WebRTC durduruldu");
+    updateVideoStatus("Call ended");
+    console.log("🛑 WebRTC stopped");
   }
   
-  // ================== CLEANUP FONKSİYONLARI ==================
+  // ================== CLEANUP FUNCTIONS ==================
   
   function cleanup() {
-    console.log("🧹 Temizlik yapılıyor...");
+    console.log("🧹 Cleaning up...");
     
     stopVideoSync();
     stopMasterFollowerSystem();
     stopChatSystem();
     stopWebRTC();
     
-    // State sıfırlama
+    // Reset state
     appState.currentVideoRoom = "";
     appState.currentChatRoom = "";
     
-    // UI sıfırlama
+    // Reset UI
     resetUI();
     
-    console.log("✅ Temizlik tamamlandı");
+    console.log("✅ Cleanup completed");
   }
   
   function resetUI() {
-    // Kod alanları
+    // Code fields
     if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
     if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
     if (elements.videoCodeInput) elements.videoCodeInput.value = "";
     if (elements.chatCodeInput) elements.chatCodeInput.value = "";
     
-    // Container'lar
+    // Containers
     if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
     if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
     if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.add("hidden");
     if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.add("hidden");
     
-    // Status'lar
-    updateSyncStatus("⏸️ Senkronizasyon kapalı");
+    // Status
+    updateSyncStatus("⏸️ Synchronization off");
     updateVideoTimes(0, 0);
     
     if (elements.masterStatus) elements.masterStatus.textContent = "---";
     if (elements.currentMaster) elements.currentMaster.textContent = "---";
-    if (elements.videoStatus) elements.videoStatus.textContent = "Görüşmeyi başlatmak için tıklayın";
+    if (elements.videoStatus) elements.videoStatus.textContent = "Click to start call";
     
-    // Generated kodları temizle
+    // Generated codes
     if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = "-";
     if (elements.generatedChatCode) elements.generatedChatCode.textContent = "-";
   }
   
-  // ================== BAŞLATMA SİSTEMİ ==================
+  // ================== STARTUP SYSTEM ==================
   
   function initApp() {
-    console.log("🚀 Final Video Sync App v4 başlatılıyor...");
+    console.log("🚀 Video Sync App v4 starting...");
     
     try {
-      // Firebase'i başlat
+      // Initialize Firebase
       if (!initFirebase()) {
-        throw new Error("Firebase başlatılamadı");
+        throw new Error("Firebase could not be initialized");
       }
       
-      // Sistemleri sırayla başlat
+      // Start systems in order
       setupPasswordValidation();
       initTabNavigation();
       initAuth();
@@ -1618,70 +1622,70 @@ document.addEventListener("DOMContentLoaded", () => {
       initMasterToggle();
       initWebRTC();
       
-      // UI başlangıç durumu
+      // Initial UI state
       setInitialUIState();
       
       // Global event listeners
       setupGlobalEventListeners();
       
       appState.initialized = true;
-      console.log("✅ App başarıyla başlatıldı");
-      showMessage("Video Sync App hazır!");
+      console.log("✅ App successfully started");
+      showMessage("Video Sync App ready!");
       
     } catch (error) {
-      console.error("❌ App başlatma hatası:", error);
-      showMessage("Uygulama başlatma hatası: " + error.message, true);
+      console.error("❌ App startup error:", error);
+      showMessage("Application startup error: " + error.message, true);
     }
   }
   
   function setInitialUIState() {
-    // Auth ekranları
+    // Auth screens
     if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
     if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
     if (elements.appContainer) elements.appContainer.classList.add("hidden");
     
-    // Container'lar
+    // Containers
     if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
     if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
     
-    // Rooms section aktif
+    // Rooms section active
     if (elements.roomsSection) elements.roomsSection.classList.remove("hidden");
     
-    // İlk tab'ı aktif yap
+    // Activate first tab
     const firstTab = document.querySelector('.nav-tab[data-tab="rooms"]');
     if (firstTab) firstTab.classList.add('active');
     
-    // Status'ları sıfırla
+    // Reset status
     resetUI();
     
-    console.log("🎨 Initial UI state ayarlandı");
+    console.log("🎨 Initial UI state set");
   }
   
   function setupGlobalEventListeners() {
     // Global error handling
     window.addEventListener('error', (event) => {
-      console.error("🚨 Global hata:", event.error);
-      showMessage("Sistem hatası oluştu!", true);
+      console.error("🚨 Global error:", event.error);
+      showMessage("System error occurred!", true);
     });
     
     window.addEventListener('unhandledrejection', (event) => {
       console.error("🚨 Promise rejection:", event.reason);
-      showMessage("Bağlantı hatası!", true);
+      showMessage("Connection error!", true);
     });
     
-    // Sayfa kapatılırken temizlik
+    // Cleanup on page close
     window.addEventListener('beforeunload', () => {
-      console.log("📄 Sayfa kapatılıyor, temizlik yapılıyor...");
+      console.log("📄 Page closing, cleaning up...");
       cleanup();
     });
     
-    // Visibility change - sekme değişimi
+    // Visibility change - tab switching
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        console.log("👁️ Sekme gizlendi");
+        console.log("👁️ Tab hidden");
       } else {
-        console.log("👁️ Sekme görünür oldu");
-        // Heartbeat yenile
+        console.log("👁️ Tab visible");
+        // Refresh heartbeat
         if (masterSystem.active && masterSystem.usersRef) {
           masterSystem.usersRef.child(appState.currentUser).update({
             lastSeen: Date.now(),
@@ -1691,12 +1695,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
     
-    console.log("🔧 Global event listeners kuruldu");
+    console.log("🔧 Global event listeners set up");
   }
   
   // ================== GLOBAL API ==================
   
-  // Debug ve kontrol için global API
+  // Global API for debugging and control
   window.videoSyncApp = {
     version: "4.0.0",
     appState,
@@ -1706,12 +1710,12 @@ document.addEventListener("DOMContentLoaded", () => {
     webrtcSystem,
     elements,
     
-    // Fonksiyonlar
+    // Functions
     cleanup,
     showMessage,
     updateSyncStatus,
     
-    // Debug fonksiyonları
+    // Debug functions
     getStatus: () => ({
       initialized: appState.initialized,
       currentUser: appState.currentUser,
@@ -1725,16 +1729,16 @@ document.addEventListener("DOMContentLoaded", () => {
     
     forceSync: () => {
       if (videoSync.active && !masterSystem.iAmMaster) {
-        console.log("🔄 Manuel sync tetikleniyor...");
-        // Manuel sync tetikle
+        console.log("🔄 Manual sync triggered...");
+        // Trigger manual sync
       }
     }
   };
   
-  // App'i başlat
+  // Start the app
   initApp();
   
-  console.log("🎉 Final Video Sync App v4 tamamen yüklendi!");
-  console.log("📋 Debug için: window.videoSyncApp");
+  console.log("🎉 Video Sync App v4 fully loaded!");
+  console.log("📋 For debugging: window.videoSyncApp");
   
 });
