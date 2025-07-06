@@ -1,21 +1,24 @@
-// ================== GELİŞMİŞ SERVICE WORKER - TAMAMEN EKSİKSİZ VERSİYON ==================
-// Manifest V3 Service Worker - Video Senkronizasyon Extension'ı için
+// ================== CLEAN SERVICE WORKER - VIDEO SYNC EXTENSION ==================
+// Manifest V3 Service Worker - Sıfırdan yazılmış temiz versiyon
 
-console.log("[SW] 🚀 Gelişmiş service worker başlatılıyor...");
+console.log("[SW] 🚀 Video Sync Extension Service Worker başlatılıyor...");
 
-// ================== YAPILANDIRMA VE SABITLER ==================
+// ================== CONFIGURATION ==================
 
 const CONFIG = {
+  // Firebase ayarları
   FIREBASE_API_KEY: "AIzaSyB69u3UFUyEX0F237B7MKMRTm-mfSvEqJU",
   FIREBASE_DATABASE_URL: "https://cconnectyigit-default-rtdb.firebaseio.com/",
   FIREBASE_AUTH_DOMAIN: "cconnectyigit.firebaseapp.com",
+  
+  // Google OAuth ayarları
   GOOGLE_CLIENT_ID: "731610663845-lcusivrfp2viicfthssffm6kkdfih5i2.apps.googleusercontent.com",
   REDIRECT_URI: "https://ncajffobbacfcdafelncglekbkpoieem.chromiumapp.org",
   
   // Timeout ayarları
   CONTENT_SCRIPT_TIMEOUT: 5000,
   VIDEO_OPERATION_TIMEOUT: 8000,
-  AUTH_TIMEOUT: 30000,
+  AUTH_TIMEOUT: 15000,
   
   // Retry ayarları
   MAX_RETRIES: 3,
@@ -25,12 +28,10 @@ const CONFIG = {
 // Desteklenen video siteleri
 const SUPPORTED_VIDEO_SITES = [
   'youtube.com', 'youtu.be', 'netflix.com', 'vimeo.com', 'twitch.tv',
-  'primevideo.com', 'amazon.com/gp/video', 'disneyplus.com', 'hulu.com',
-  'hbo', 'max.com', 'dailymotion.com', 'facebook.com', 'instagram.com',
-  'tiktok.com', 'video', 'watch', 'player'
+  'primevideo.com', 'disneyplus.com', 'hulu.com', 'dailymotion.com'
 ];
 
-// ================== GLOBAL DEĞIŞKENLER ==================
+// ================== GLOBAL STATE ==================
 
 let serviceWorkerState = {
   isReady: false,
@@ -41,6 +42,8 @@ let serviceWorkerState = {
     errorCount: 0,
     videoOperations: 0,
     authAttempts: 0,
+    authSuccess: 0,
+    authFailures: 0,
     lastActivity: Date.now(),
     startTime: Date.now()
   }
@@ -48,44 +51,30 @@ let serviceWorkerState = {
 
 // ================== SERVICE WORKER LIFECYCLE ==================
 
-// Extension kurulduğunda
+// Extension kurulum
 chrome.runtime.onInstalled.addListener((details) => {
-  console.log(`[SW] 📦 Extension ${details.reason}:`, details);
+  console.log(`[SW] 📦 Extension ${details.reason}`);
   
   // Side panel ayarla
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-    .then(() => console.log("[SW] ✅ Side panel yapılandırıldı"))
-    .catch(error => console.error("[SW] ❌ Side panel hatası:", error));
-  
-  // İlk kurulum mesajı
-  if (details.reason === 'install') {
-    console.log("[SW] 🎉 İlk kurulum tamamlandı - Hoş geldiniz!");
-  } else if (details.reason === 'update') {
-    const oldVersion = details.previousVersion;
-    const newVersion = chrome.runtime.getManifest().version;
-    console.log(`[SW] 🔄 Güncelleme: ${oldVersion} → ${newVersion}`);
-  }
+    .then(() => console.log("[SW] ✅ Side panel configured"))
+    .catch(error => console.error("[SW] ❌ Side panel error:", error));
   
   serviceWorkerState.isReady = true;
 });
 
-// Extension başlatıldığında
+// Extension başlatma
 chrome.runtime.onStartup.addListener(() => {
-  console.log("[SW] 🟢 Extension başlatıldı");
+  console.log("[SW] 🟢 Extension started");
   serviceWorkerState.isReady = true;
   serviceWorkerState.startTime = Date.now();
 });
 
-// ================== GLOBAL ERROR HANDLING ==================
+// ================== ERROR HANDLING ==================
 
+// Global error handling
 self.addEventListener('error', (event) => {
-  console.error('[SW] 💥 Global Error:', {
-    message: event.message,
-    filename: event.filename,
-    lineno: event.lineno,
-    colno: event.colno,
-    error: event.error
-  });
+  console.error('[SW] 💥 Global Error:', event.error);
   serviceWorkerState.performanceMetrics.errorCount++;
 });
 
@@ -95,18 +84,19 @@ self.addEventListener('unhandledrejection', (event) => {
   event.preventDefault();
 });
 
-// ================== MESAJ YÖNETİM SİSTEMİ ==================
+// ================== MESSAGE SYSTEM ==================
 
+// Ana mesaj listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Performans takibi
+  // Performance tracking
   serviceWorkerState.performanceMetrics.messageCount++;
   serviceWorkerState.performanceMetrics.lastActivity = Date.now();
   
-  console.log(`[SW] 📨 Mesaj alındı:`, { action: message?.action, sender: sender?.tab?.id });
+  console.log(`[SW] 📨 Message:`, { action: message?.action });
   
   // Mesaj validasyonu
   if (!message || typeof message.action !== 'string') {
-    console.warn("[SW] ⚠️ Geçersiz mesaj formatı:", message);
+    console.warn("[SW] ⚠️ Invalid message:", message);
     sendResponse({ success: false, error: "INVALID_MESSAGE_FORMAT" });
     return false;
   }
@@ -116,33 +106,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // Async response için
 });
 
-// Ana mesaj işleyici
+// Ana mesaj handler
 async function handleMessage(message, sender, sendResponse) {
   try {
     const { action } = message;
     
     switch (action) {
-      // Ping test
       case "ping":
-        console.log("[SW] 📡 Ping alındı");
         sendResponse({ success: true, pong: true, timestamp: Date.now() });
         break;
         
-      // Authentication işlemleri
       case "login":
       case "signup":
-        await handleAuthenticationRequest(message, sendResponse);
+        await handleAuth(message, sendResponse);
         break;
         
       case "googleLogin":
-        await handleGoogleAuthentication(sendResponse);
+        await handleGoogleAuth(sendResponse);
         break;
         
       case "logout":
         await handleLogout(sendResponse);
         break;
       
-      // Video işlemleri
       case "getVideoInfo":
         await handleGetVideoInfo(sendResponse);
         break;
@@ -159,19 +145,17 @@ async function handleMessage(message, sender, sendResponse) {
         await handlePauseVideo(sendResponse);
         break;
       
-      // Content script mesajları
       case "videoStateChanged":
-        handleVideoStateChange(message, sendResponse);
+        sendResponse({ success: true });
         break;
         
-      // Bilinmeyen action
       default:
-        console.warn(`[SW] ❓ Bilinmeyen action: ${action}`);
-        sendResponse({ success: false, error: "UNKNOWN_ACTION", action });
+        console.warn(`[SW] ❓ Unknown action: ${action}`);
+        sendResponse({ success: false, error: "UNKNOWN_ACTION" });
     }
     
   } catch (error) {
-    console.error("[SW] 💥 Mesaj işleme hatası:", error);
+    console.error("[SW] 💥 Message handling error:", error);
     serviceWorkerState.performanceMetrics.errorCount++;
     sendResponse({ 
       success: false, 
@@ -181,187 +165,34 @@ async function handleMessage(message, sender, sendResponse) {
   }
 }
 
-// ================== VIDEO İŞLEMLERİ ==================
+// ================== AUTHENTICATION SYSTEM ==================
 
-// Video bilgilerini al
-async function handleGetVideoInfo(sendResponse) {
-  console.log("[SW] 📺 Video bilgileri isteniyor...");
-  
-  try {
-    const activeTab = await getActiveTab();
-    if (!activeTab) {
-      sendResponse({ success: false, error: "NO_ACTIVE_TAB" });
-      return;
-    }
-    
-    console.log(`[SW] 🎯 Aktif tab: ${activeTab.id} - ${activeTab.url}`);
-    
-    // Video sitesi kontrolü (isteğe bağlı)
-    if (!isVideoSite(activeTab.url)) {
-      console.warn(`[SW] ⚠️ Video sitesi değil: ${activeTab.url}`);
-      // Yine de devam et, kullanıcı farklı bir sitede video izliyor olabilir
-    }
-    
-    // Content script'i hazırla
-    await ensureContentScript(activeTab.id);
-    
-    // Video bilgilerini al
-    const response = await sendMessageToContentScript(activeTab.id, { 
-      action: "getVideoInfo" 
-    }, CONFIG.VIDEO_OPERATION_TIMEOUT);
-    
-    if (response && response.success) {
-      console.log("[SW] ✅ Video bilgileri alındı:", {
-        duration: response.duration,
-        currentTime: response.currentTime,
-        paused: response.paused,
-        playerType: response.playerType
-      });
-      serviceWorkerState.performanceMetrics.videoOperations++;
-    } else {
-      console.warn("[SW] ⚠️ Video bilgileri alınamadı:", response);
-    }
-    
-    sendResponse(response || { success: false, error: "NO_RESPONSE_FROM_CONTENT_SCRIPT" });
-    
-  } catch (error) {
-    console.error("[SW] ❌ Video bilgisi alma hatası:", error);
-    sendResponse({ 
-      success: false, 
-      error: "VIDEO_INFO_ERROR", 
-      details: error.message 
-    });
-  }
-}
-
-// Video zamanını ayarla
-async function handleSetVideoTime(message, sendResponse) {
-  const targetTime = parseFloat(message.currentTime);
-  
-  console.log(`[SW] ⏭️ Video zamanı ayarlanıyor: ${targetTime}s`);
-  
-  try {
-    // Validasyon
-    if (isNaN(targetTime) || targetTime < 0) {
-      sendResponse({ success: false, error: "INVALID_TIME_VALUE" });
-      return;
-    }
-    
-    const activeTab = await getActiveTab();
-    if (!activeTab) {
-      sendResponse({ success: false, error: "NO_ACTIVE_TAB" });
-      return;
-    }
-    
-    await ensureContentScript(activeTab.id);
-    
-    const response = await sendMessageToContentScript(activeTab.id, {
-      action: "setVideoTime",
-      currentTime: targetTime
-    }, CONFIG.VIDEO_OPERATION_TIMEOUT);
-    
-    if (response && response.success) {
-      console.log(`[SW] ✅ Video zamanı ayarlandı: ${targetTime}s → ${response.actualTime}s`);
-      serviceWorkerState.performanceMetrics.videoOperations++;
-    } else {
-      console.warn(`[SW] ⚠️ Video zaman ayarlama başarısız:`, response);
-    }
-    
-    sendResponse(response || { success: false, error: "NO_RESPONSE_FROM_CONTENT_SCRIPT" });
-    
-  } catch (error) {
-    console.error("[SW] ❌ Video zaman ayarlama hatası:", error);
-    sendResponse({ 
-      success: false, 
-      error: "SET_TIME_ERROR", 
-      details: error.message 
-    });
-  }
-}
-
-// Video oynat
-async function handlePlayVideo(sendResponse) {
-  console.log("[SW] ▶️ Video oynatma işlemi...");
-  
-  try {
-    const result = await executeVideoAction("playVideo");
-    sendResponse(result);
-  } catch (error) {
-    console.error("[SW] ❌ Video oynatma hatası:", error);
-    sendResponse({ 
-      success: false, 
-      error: "PLAY_VIDEO_ERROR", 
-      details: error.message 
-    });
-  }
-}
-
-// Video duraklat
-async function handlePauseVideo(sendResponse) {
-  console.log("[SW] ⏸️ Video duraklama işlemi...");
-  
-  try {
-    const result = await executeVideoAction("pauseVideo");
-    sendResponse(result);
-  } catch (error) {
-    console.error("[SW] ❌ Video duraklama hatası:", error);
-    sendResponse({ 
-      success: false, 
-      error: "PAUSE_VIDEO_ERROR", 
-      details: error.message 
-    });
-  }
-}
-
-// Video aksiyonu çalıştır (yardımcı fonksiyon)
-async function executeVideoAction(action) {
-  const activeTab = await getActiveTab();
-  if (!activeTab) {
-    return { success: false, error: "NO_ACTIVE_TAB" };
-  }
-  
-  await ensureContentScript(activeTab.id);
-  
-  const response = await sendMessageToContentScript(activeTab.id, { 
-    action 
-  }, CONFIG.VIDEO_OPERATION_TIMEOUT);
-  
-  if (response && response.success) {
-    serviceWorkerState.performanceMetrics.videoOperations++;
-    console.log(`[SW] ✅ Video aksiyonu başarılı: ${action}`);
-  } else {
-    console.warn(`[SW] ⚠️ Video aksiyonu başarısız: ${action}`, response);
-  }
-  
-  return response || { success: false, error: "NO_RESPONSE_FROM_CONTENT_SCRIPT" };
-}
-
-// Video durum değişikliği
-function handleVideoStateChange(message, sendResponse) {
-  console.log("[SW] 🎬 Video durum değişikliği:", message.videoState);
-  sendResponse({ success: true });
-}
-
-// ================== AUTHENTICATION İŞLEMLERİ ==================
-
-// Normal auth (email/password)
-async function handleAuthenticationRequest(message, sendResponse) {
+// Email/Password Authentication
+async function handleAuth(message, sendResponse) {
   const { action, email, password, nickname } = message;
   
-  console.log(`[SW] 🔐 ${action} işlemi başlatılıyor: ${email}`);
+  console.log(`[SW] 🔐 ${action} başlatılıyor: ${email}`);
   serviceWorkerState.performanceMetrics.authAttempts++;
   
   try {
-    // Şifre validasyonu (signup için)
+    // Input validation
+    if (!email || !password) {
+      throw new Error("EMAIL_PASSWORD_REQUIRED");
+    }
+    
+    if (!isValidEmail(email)) {
+      throw new Error("INVALID_EMAIL_FORMAT");
+    }
+    
+    // Signup için ek validasyon
     if (action === "signup") {
+      if (!nickname || nickname.trim().length < 2) {
+        throw new Error("NICKNAME_REQUIRED");
+      }
+      
       const passwordErrors = validatePassword(password);
       if (passwordErrors.length > 0) {
-        sendResponse({ 
-          success: false, 
-          error: "PASSWORD_VALIDATION_FAILED", 
-          details: passwordErrors 
-        });
-        return;
+        throw new Error("PASSWORD_VALIDATION_FAILED");
       }
     }
     
@@ -377,60 +208,71 @@ async function handleAuthenticationRequest(message, sendResponse) {
     
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        email: email.trim(),
+        password: password,
+        returnSecureToken: true
+      }),
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
-    const data = await response.json();
     
     if (!response.ok) {
-      console.error(`[SW] ❌ ${action} hatası:`, data.error);
-      sendResponse({ 
-        success: false, 
-        error: data.error?.message || "AUTHENTICATION_FAILED" 
-      });
-      return;
+      const errorData = await response.json().catch(() => ({ error: { message: "UNKNOWN_AUTH_ERROR" } }));
+      throw new Error(errorData.error?.message || `HTTP_${response.status}`);
     }
     
+    const data = await response.json();
     const userId = data.localId;
     
-    // Kullanıcı verisini kaydet/güncelle
-    if (isSignup && nickname) {
-      await saveUserData(userId, { email, nickname });
-    } else if (!isSignup) {
-      await updateLastLogin(userId);
+    // User data işlemleri
+    let displayName = email.split('@')[0];
+    
+    try {
+      if (isSignup && nickname) {
+        await saveUserData(userId, { email: email.trim(), nickname: nickname.trim() });
+        displayName = nickname.trim();
+      } else if (!isSignup) {
+        const userData = await getUserData(userId);
+        if (userData && userData.nickname) {
+          displayName = userData.nickname;
+        }
+        await updateLastLogin(userId);
+      }
+    } catch (dataError) {
+      console.warn("[SW] ⚠️ User data operation failed:", dataError);
     }
     
-    // Kullanıcı bilgilerini al
-    const userData = await getUserData(userId);
-    const displayName = userData?.nickname || email.split('@')[0];
-    
-    console.log(`[SW] ✅ ${action} başarılı: ${displayName}`);
+    serviceWorkerState.performanceMetrics.authSuccess++;
+    console.log(`[SW] ✅ ${action} successful: ${displayName}`);
     sendResponse({ success: true, nickname: displayName });
     
   } catch (error) {
-    console.error(`[SW] 💥 ${action} network hatası:`, error);
+    serviceWorkerState.performanceMetrics.authFailures++;
+    console.error(`[SW] ❌ ${action} error:`, error);
     
+    let errorCode = error.message;
     if (error.name === 'AbortError') {
-      sendResponse({ 
-        success: false, 
-        error: "AUTH_TIMEOUT", 
-        details: "Authentication request timed out" 
-      });
-    } else {
-      sendResponse({ 
-        success: false, 
-        error: "NETWORK_ERROR", 
-        details: error.message 
-      });
+      errorCode = "AUTH_TIMEOUT";
+    } else if (error.message.includes('fetch')) {
+      errorCode = "NETWORK_ERROR";
     }
+    
+    sendResponse({ 
+      success: false, 
+      error: errorCode,
+      details: error.message 
+    });
   }
 }
 
-// Google authentication
-async function handleGoogleAuthentication(sendResponse) {
+// Google Authentication
+async function handleGoogleAuth(sendResponse) {
   console.log("[SW] 🔐 Google authentication başlatılıyor...");
   serviceWorkerState.performanceMetrics.authAttempts++;
   
@@ -447,38 +289,44 @@ async function handleGoogleAuthentication(sendResponse) {
         }
         
         if (!redirectUrl) {
-          throw new Error("Authentication cancelled");
+          throw new Error("AUTH_CANCELLED");
         }
         
         // Token'ı çıkar
         const accessToken = extractAccessToken(redirectUrl);
         if (!accessToken) {
-          throw new Error("No access token received");
+          throw new Error("NO_ACCESS_TOKEN");
         }
         
-        // Kullanıcı bilgilerini al
+        // User info al
         const userInfo = await fetchGoogleUserInfo(accessToken);
         
         // Firebase'e kaydet
         const firebaseData = await signInWithGoogle(accessToken);
         
-        // Kullanıcı verisini kaydet
+        // User data kaydet
         const userId = firebaseData.localId;
         const email = firebaseData.email || userInfo.email;
         const displayName = firebaseData.displayName || userInfo.name || email.split('@')[0];
         
-        await saveUserData(userId, {
-          email,
-          nickname: displayName,
-          photoUrl: userInfo.picture,
-          provider: 'google'
-        });
+        try {
+          await saveUserData(userId, {
+            email,
+            nickname: displayName,
+            photoUrl: userInfo.picture,
+            provider: 'google'
+          });
+        } catch (dataError) {
+          console.warn("[SW] ⚠️ Google user data save failed:", dataError);
+        }
         
-        console.log("[SW] ✅ Google authentication başarılı:", displayName);
+        serviceWorkerState.performanceMetrics.authSuccess++;
+        console.log("[SW] ✅ Google authentication successful:", displayName);
         sendResponse({ success: true, nickname: displayName });
         
       } catch (error) {
-        console.error("[SW] ❌ Google auth callback hatası:", error);
+        serviceWorkerState.performanceMetrics.authFailures++;
+        console.error("[SW] ❌ Google auth error:", error);
         sendResponse({ 
           success: false, 
           error: "GOOGLE_AUTH_ERROR", 
@@ -488,7 +336,8 @@ async function handleGoogleAuthentication(sendResponse) {
     });
     
   } catch (error) {
-    console.error("[SW] 💥 Google auth genel hatası:", error);
+    serviceWorkerState.performanceMetrics.authFailures++;
+    console.error("[SW] ❌ Google auth setup error:", error);
     sendResponse({ 
       success: false, 
       error: "GOOGLE_AUTH_SETUP_ERROR", 
@@ -502,16 +351,20 @@ async function handleLogout(sendResponse) {
   console.log("[SW] 🚪 Logout işlemi...");
   
   try {
-    // Chrome identity cache'ini temizle
     await new Promise((resolve) => {
-      chrome.identity.clearAllCachedAuthTokens(resolve);
+      chrome.identity.clearAllCachedAuthTokens(() => {
+        if (chrome.runtime.lastError) {
+          console.warn("[SW] ⚠️ Token clear warning:", chrome.runtime.lastError);
+        }
+        resolve();
+      });
     });
     
-    console.log("[SW] ✅ Logout başarılı");
+    console.log("[SW] ✅ Logout successful");
     sendResponse({ success: true });
     
   } catch (error) {
-    console.error("[SW] ❌ Logout hatası:", error);
+    console.error("[SW] ❌ Logout error:", error);
     sendResponse({ 
       success: false, 
       error: "LOGOUT_ERROR", 
@@ -520,16 +373,19 @@ async function handleLogout(sendResponse) {
   }
 }
 
-// ================== YARDIMCI FONKSİYONLAR - AUTH ==================
+// ================== AUTH HELPER FUNCTIONS ==================
+
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
 function validatePassword(password) {
   const errors = [];
-  
-  if (password.length < 12) errors.push("PASSWORD_TOO_SHORT");
+  if (password.length < 8) errors.push("PASSWORD_TOO_SHORT");
   if (!/[A-Z]/.test(password)) errors.push("PASSWORD_NO_UPPERCASE");
   if (!/[a-z]/.test(password)) errors.push("PASSWORD_NO_LOWERCASE");
   if (!/[0-9]/.test(password)) errors.push("PASSWORD_NO_NUMBER");
-  
   return errors;
 }
 
@@ -538,9 +394,9 @@ function buildGoogleAuthUrl() {
     client_id: CONFIG.GOOGLE_CLIENT_ID,
     response_type: 'token',
     redirect_uri: CONFIG.REDIRECT_URI,
-    scope: 'email profile'
+    scope: 'email profile',
+    prompt: 'select_account'
   });
-  
   return `https://accounts.google.com/o/oauth2/auth?${params.toString()}`;
 }
 
@@ -550,7 +406,7 @@ function extractAccessToken(redirectUrl) {
     const params = new URLSearchParams(url.hash.substring(1));
     return params.get('access_token');
   } catch (error) {
-    console.error("[SW] Token extraction hatası:", error);
+    console.error("[SW] Token extraction error:", error);
     return null;
   }
 }
@@ -561,14 +417,17 @@ async function fetchGoogleUserInfo(accessToken) {
   
   try {
     const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo?alt=json', {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { 
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json'
+      },
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch user info');
+      throw new Error(`Failed to fetch user info: ${response.status}`);
     }
     
     return await response.json();
@@ -585,7 +444,10 @@ async function signInWithGoogle(accessToken) {
   try {
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${CONFIG.FIREBASE_API_KEY}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         requestUri: CONFIG.REDIRECT_URI,
         postBody: `access_token=${accessToken}&providerId=google.com`,
@@ -595,13 +457,13 @@ async function signInWithGoogle(accessToken) {
     });
     
     clearTimeout(timeoutId);
-    const data = await response.json();
     
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Firebase auth failed');
+      const errorData = await response.json().catch(() => ({ error: { message: "FIREBASE_GOOGLE_AUTH_FAILED" } }));
+      throw new Error(errorData.error?.message || 'Firebase Google auth failed');
     }
     
-    return data;
+    return await response.json();
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
@@ -621,7 +483,10 @@ async function saveUserData(userId, userData) {
   try {
     const response = await fetch(`${CONFIG.FIREBASE_DATABASE_URL}/users/${userId}.json`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify(dataToSave),
       signal: controller.signal
     });
@@ -629,15 +494,14 @@ async function saveUserData(userId, userData) {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      throw new Error('Failed to save user data');
+      throw new Error(`Failed to save user data: ${response.status}`);
     }
     
-    console.log("[SW] ✅ User data başarıyla kaydedildi:", userId);
+    console.log("[SW] ✅ User data saved:", userId);
     return await response.json();
     
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error("[SW] ❌ User data kaydetme hatası:", error);
     throw error;
   }
 }
@@ -649,20 +513,21 @@ async function updateLastLogin(userId) {
     
     const response = await fetch(`${CONFIG.FIREBASE_DATABASE_URL}/users/${userId}/lastLogin.json`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify(Date.now()),
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
     
-    if (!response.ok) {
-      console.warn("[SW] ⚠️ Last login güncellenemedi");
-    } else {
-      console.log("[SW] ✅ Last login güncellendi:", userId);
+    if (response.ok) {
+      console.log("[SW] ✅ Last login updated:", userId);
     }
   } catch (error) {
-    console.warn("[SW] ⚠️ Last login güncellenemedi:", error);
+    console.warn("[SW] ⚠️ Last login update error:", error);
   }
 }
 
@@ -672,46 +537,175 @@ async function getUserData(userId) {
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     const response = await fetch(`${CONFIG.FIREBASE_DATABASE_URL}/users/${userId}.json`, {
+      headers: { 'Accept': 'application/json' },
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
     
     if (response.ok) {
-      const data = await response.json();
-      console.log("[SW] ✅ User data alındı:", userId);
-      return data;
-    } else {
-      console.warn("[SW] ⚠️ User data bulunamadı:", userId);
-      return null;
+      return await response.json();
     }
+    return null;
   } catch (error) {
-    console.warn("[SW] ⚠️ User data alınamadı:", error);
+    console.warn("[SW] ⚠️ User data retrieval error:", error);
     return null;
   }
 }
 
-// ================== CONTENT SCRIPT YÖNETİMİ ==================
+// ================== VIDEO OPERATIONS ==================
 
-// Content script'in yüklendiğinden emin ol
+// Video bilgilerini al
+async function handleGetVideoInfo(sendResponse) {
+  console.log("[SW] 📺 Video info requested...");
+  
+  try {
+    const activeTab = await getActiveTab();
+    if (!activeTab) {
+      sendResponse({ success: false, error: "NO_ACTIVE_TAB" });
+      return;
+    }
+    
+    await ensureContentScript(activeTab.id);
+    
+    const response = await sendMessageToContentScript(activeTab.id, { 
+      action: "getVideoInfo" 
+    }, CONFIG.VIDEO_OPERATION_TIMEOUT);
+    
+    if (response && response.success) {
+      serviceWorkerState.performanceMetrics.videoOperations++;
+      console.log("[SW] ✅ Video info retrieved");
+    } else {
+      console.warn("[SW] ⚠️ Video info failed:", response);
+    }
+    
+    sendResponse(response || { success: false, error: "NO_RESPONSE_FROM_CONTENT_SCRIPT" });
+    
+  } catch (error) {
+    console.error("[SW] ❌ Video info error:", error);
+    sendResponse({ 
+      success: false, 
+      error: "VIDEO_INFO_ERROR", 
+      details: error.message 
+    });
+  }
+}
+
+// Video zamanını ayarla
+async function handleSetVideoTime(message, sendResponse) {
+  const targetTime = parseFloat(message.currentTime);
+  
+  console.log(`[SW] ⏭️ Setting video time: ${targetTime}s`);
+  
+  try {
+    if (isNaN(targetTime) || targetTime < 0) {
+      sendResponse({ success: false, error: "INVALID_TIME_VALUE" });
+      return;
+    }
+    
+    const activeTab = await getActiveTab();
+    if (!activeTab) {
+      sendResponse({ success: false, error: "NO_ACTIVE_TAB" });
+      return;
+    }
+    
+    await ensureContentScript(activeTab.id);
+    
+    const response = await sendMessageToContentScript(activeTab.id, {
+      action: "setVideoTime",
+      currentTime: targetTime
+    }, CONFIG.VIDEO_OPERATION_TIMEOUT);
+    
+    if (response && response.success) {
+      serviceWorkerState.performanceMetrics.videoOperations++;
+      console.log(`[SW] ✅ Video time set: ${targetTime}s`);
+    }
+    
+    sendResponse(response || { success: false, error: "NO_RESPONSE_FROM_CONTENT_SCRIPT" });
+    
+  } catch (error) {
+    console.error("[SW] ❌ Video time setting error:", error);
+    sendResponse({ 
+      success: false, 
+      error: "SET_TIME_ERROR", 
+      details: error.message 
+    });
+  }
+}
+
+// Video oynat
+async function handlePlayVideo(sendResponse) {
+  console.log("[SW] ▶️ Play video...");
+  
+  try {
+    const result = await executeVideoAction("playVideo");
+    sendResponse(result);
+  } catch (error) {
+    console.error("[SW] ❌ Play video error:", error);
+    sendResponse({ 
+      success: false, 
+      error: "PLAY_VIDEO_ERROR", 
+      details: error.message 
+    });
+  }
+}
+
+// Video duraklat
+async function handlePauseVideo(sendResponse) {
+  console.log("[SW] ⏸️ Pause video...");
+  
+  try {
+    const result = await executeVideoAction("pauseVideo");
+    sendResponse(result);
+  } catch (error) {
+    console.error("[SW] ❌ Pause video error:", error);
+    sendResponse({ 
+      success: false, 
+      error: "PAUSE_VIDEO_ERROR", 
+      details: error.message 
+    });
+  }
+}
+
+// Video aksiyonu çalıştır
+async function executeVideoAction(action) {
+  const activeTab = await getActiveTab();
+  if (!activeTab) {
+    return { success: false, error: "NO_ACTIVE_TAB" };
+  }
+  
+  await ensureContentScript(activeTab.id);
+  
+  const response = await sendMessageToContentScript(activeTab.id, { 
+    action 
+  }, CONFIG.VIDEO_OPERATION_TIMEOUT);
+  
+  if (response && response.success) {
+    serviceWorkerState.performanceMetrics.videoOperations++;
+    console.log(`[SW] ✅ Video action successful: ${action}`);
+  }
+  
+  return response || { success: false, error: "NO_RESPONSE_FROM_CONTENT_SCRIPT" };
+}
+
+// ================== CONTENT SCRIPT MANAGEMENT ==================
+
+// Content script'in yüklenmesini sağla
 async function ensureContentScript(tabId) {
-  // Zaten enjekte edilmiş mi kontrol et
   if (serviceWorkerState.contentScriptInjected.has(tabId)) {
-    console.log(`[SW] ✅ Content script zaten mevcut: tab ${tabId}`);
     return true;
   }
   
   try {
-    // Ping ile kontrol et
+    // Ping ile test et
     const pingResponse = await sendMessageToContentScript(tabId, { action: "ping" }, 2000);
     if (pingResponse && pingResponse.pong) {
       serviceWorkerState.contentScriptInjected.add(tabId);
-      console.log(`[SW] ✅ Content script zaten çalışıyor: tab ${tabId}`);
+      console.log(`[SW] ✅ Content script already running: tab ${tabId}`);
       return true;
     }
   } catch (error) {
-    // Script yüklenmemiş, enjekte et
-    console.log(`[SW] 📝 Content script enjekte ediliyor: tab ${tabId}`);
+    console.log(`[SW] 📝 Content script injecting: tab ${tabId}`);
   }
   
   try {
@@ -720,21 +714,19 @@ async function ensureContentScript(tabId) {
       files: ['content-script.js']
     });
     
-    // Yüklenmesi için bekle
     await sleep(1000);
     
-    // Ping ile test et
     const testResponse = await sendMessageToContentScript(tabId, { action: "ping" }, 3000);
     if (testResponse && testResponse.pong) {
       serviceWorkerState.contentScriptInjected.add(tabId);
-      console.log(`[SW] ✅ Content script başarıyla enjekte edildi: tab ${tabId}`);
+      console.log(`[SW] ✅ Content script injected: tab ${tabId}`);
       return true;
     } else {
-      throw new Error("Content script enjekte edildi ama ping başarısız");
+      throw new Error("Content script injected but ping failed");
     }
     
   } catch (error) {
-    console.error(`[SW] ❌ Content script enjekte edilemedi: tab ${tabId}`, error);
+    console.error(`[SW] ❌ Content script injection failed: tab ${tabId}`, error);
     throw new Error(`Content script injection failed: ${error.message}`);
   }
 }
@@ -763,7 +755,7 @@ async function sendMessageToContentScript(tabId, message, timeout = CONFIG.CONTE
   });
 }
 
-// ================== TAB YÖNETİMİ ==================
+// ================== TAB MANAGEMENT ==================
 
 // Aktif tab'ı al
 async function getActiveTab() {
@@ -775,15 +767,14 @@ async function getActiveTab() {
     }
     return null;
   } catch (error) {
-    console.error("[SW] ❌ Aktif tab alınamadı:", error);
+    console.error("[SW] ❌ Failed to get active tab:", error);
     return null;
   }
 }
 
-// Video sitesi kontrolü
+// Video sitesi mi kontrol et
 function isVideoSite(url) {
   if (!url) return false;
-  
   const lowerUrl = url.toLowerCase();
   return SUPPORTED_VIDEO_SITES.some(site => lowerUrl.includes(site));
 }
@@ -791,21 +782,20 @@ function isVideoSite(url) {
 // Tab event listeners
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete') {
-    // Content script injection state'ini temizle
     serviceWorkerState.contentScriptInjected.delete(tabId);
     
     if (tab.url && isVideoSite(tab.url)) {
-      console.log(`[SW] 📺 Video sitesi tespit edildi: ${tab.url}`);
+      console.log(`[SW] 📺 Video site detected: ${tab.url}`);
     }
   }
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   serviceWorkerState.contentScriptInjected.delete(tabId);
-  console.log(`[SW] 🗑️ Tab kapatıldı, temizlik yapıldı: ${tabId}`);
+  console.log(`[SW] 🗑️ Tab closed: ${tabId}`);
 });
 
-// ================== UTILITY FONKSİYONLAR ==================
+// ================== UTILITY FUNCTIONS ==================
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -820,9 +810,8 @@ function getExtensionInfo() {
   };
 }
 
-// ================== PERFORMANCE MONİTORİNG ==================
+// ================== PERFORMANCE MONITORING ==================
 
-// Performans raporu
 function getPerformanceReport() {
   const uptime = Date.now() - serviceWorkerState.performanceMetrics.startTime;
   const lastActivity = Date.now() - serviceWorkerState.performanceMetrics.lastActivity;
@@ -832,173 +821,41 @@ function getPerformanceReport() {
     uptime: Math.floor(uptime / 1000),
     lastActivity: Math.floor(lastActivity / 1000),
     contentScriptsInjected: serviceWorkerState.contentScriptInjected.size,
-    isReady: serviceWorkerState.isReady
+    isReady: serviceWorkerState.isReady,
+    authSuccessRate: serviceWorkerState.performanceMetrics.authAttempts > 0 
+      ? (serviceWorkerState.performanceMetrics.authSuccess / serviceWorkerState.performanceMetrics.authAttempts * 100).toFixed(1) + '%'
+      : '0%'
   };
 }
 
-// Periyodik performans raporu (development için)
+// Performance raporu (her 5 dakikada)
 setInterval(() => {
   const report = getPerformanceReport();
   if (report.messageCount > 0) {
-    console.log("[SW] 📊 Performans raporu:", report);
+    console.log("[SW] 📊 Performance report:", report);
   }
-}, 5 * 60 * 1000); // 5 dakikada bir
+}, 5 * 60 * 1000);
 
-// ================== CLEANUP VE MAINTENANCE ==================
+// ================== CLEANUP ==================
 
-// Periyodik temizlik
+// Tab temizliği (her 2 dakikada)
 setInterval(() => {
-  // Eski tab kayıtlarını temizle
   chrome.tabs.query({}, (tabs) => {
     const activeTabs = new Set(tabs.map(tab => tab.id));
     
     for (const tabId of serviceWorkerState.contentScriptInjected) {
       if (!activeTabs.has(tabId)) {
         serviceWorkerState.contentScriptInjected.delete(tabId);
-        console.log(`[SW] 🧹 Eski tab kaydı temizlendi: ${tabId}`);
+        console.log(`[SW] 🧹 Cleaned old tab: ${tabId}`);
       }
     }
   });
-}, 2 * 60 * 1000); // 2 dakikada bir
+}, 2 * 60 * 1000);
 
-// ================== EMERGENCY HANDLERS ==================
+// ================== HEALTH CHECK ==================
 
-// Acil durum mesaj işleyicisi
-chrome.runtime.onConnect.addListener((port) => {
-  console.log(`[SW] 🔌 Port bağlantısı: ${port.name}`);
-  
-  port.onMessage.addListener((message) => {
-    console.log(`[SW] 📨 Port mesajı:`, message);
-    
-    if (message.action === 'emergency_reset') {
-      console.log("[SW] 🚨 Acil durum reset başlatılıyor...");
-      
-      // Content script cache'ini temizle
-      serviceWorkerState.contentScriptInjected.clear();
-      
-      // Performans metriklerini sıfırla
-      serviceWorkerState.performanceMetrics = {
-        messageCount: 0,
-        errorCount: 0,
-        videoOperations: 0,
-        authAttempts: 0,
-        lastActivity: Date.now(),
-        startTime: Date.now()
-      };
-      
-      port.postMessage({ success: true, message: "Reset tamamlandı" });
-    }
-  });
-  
-  port.onDisconnect.addListener(() => {
-    console.log(`[SW] 🔌 Port bağlantısı kesildi: ${port.name}`);
-  });
-});
-
-// ================== EXTENSION LIFECYCLE MANAGEMENT ==================
-
-// Extension suspend edildiğinde
-chrome.runtime.onSuspend.addListener(() => {
-  console.log("[SW] 😴 Service worker suspend ediliyor...");
-  
-  // Son durumu kaydet
-  const finalReport = getPerformanceReport();
-  console.log("[SW] 📊 Final performans raporu:", finalReport);
-});
-
-// Extension suspend cancelled edildiğinde  
-chrome.runtime.onSuspendCanceled.addListener(() => {
-  console.log("[SW] 🔄 Service worker suspend iptal edildi");
-  serviceWorkerState.isReady = true;
-});
-
-// ================== MESSAGE ROUTING HELPERS ==================
-
-// Mesaj tipine göre timeout belirleme
-function getTimeoutForAction(action) {
-  switch (action) {
-    case 'ping':
-      return 1000;
-    case 'getVideoInfo':
-      return CONFIG.VIDEO_OPERATION_TIMEOUT;
-    case 'setVideoTime':
-    case 'playVideo':
-    case 'pauseVideo':
-      return CONFIG.VIDEO_OPERATION_TIMEOUT;
-    default:
-      return CONFIG.CONTENT_SCRIPT_TIMEOUT;
-  }
-}
-
-// Retry mekanizması ile mesaj gönderme
-async function sendMessageWithRetry(tabId, message, maxRetries = CONFIG.MAX_RETRIES) {
-  let lastError;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const timeout = getTimeoutForAction(message.action);
-      const response = await sendMessageToContentScript(tabId, message, timeout);
-      
-      console.log(`[SW] ✅ Mesaj başarılı (${attempt}. deneme): ${message.action}`);
-      return response;
-      
-    } catch (error) {
-      lastError = error;
-      console.warn(`[SW] ⚠️ Mesaj başarısız (${attempt}/${maxRetries}): ${message.action}`, error.message);
-      
-      if (attempt < maxRetries) {
-        // Content script'i yeniden enjekte etmeyi dene
-        if (error.message.includes('Could not establish connection')) {
-          try {
-            serviceWorkerState.contentScriptInjected.delete(tabId);
-            await ensureContentScript(tabId);
-          } catch (injectionError) {
-            console.error(`[SW] ❌ Content script re-injection başarısız:`, injectionError);
-          }
-        }
-        
-        // Exponential backoff
-        await sleep(CONFIG.RETRY_DELAY * attempt);
-      }
-    }
-  }
-  
-  throw lastError;
-}
-
-// ================== ADVANCED ERROR RECOVERY ==================
-
-// Hata kurtarma mekanizması
-async function attemptErrorRecovery(tabId, originalError) {
-  console.log(`[SW] 🔧 Hata kurtarma başlatılıyor: tab ${tabId}`);
-  
-  try {
-    // 1. Tab'ın hala aktif olduğunu kontrol et
-    const tab = await chrome.tabs.get(tabId);
-    if (!tab) {
-      throw new Error("Tab no longer exists");
-    }
-    
-    // 2. Content script cache'ini temizle
-    serviceWorkerState.contentScriptInjected.delete(tabId);
-    
-    // 3. Content script'i yeniden enjekte et
-    await ensureContentScript(tabId);
-    
-    console.log(`[SW] ✅ Hata kurtarma başarılı: tab ${tabId}`);
-    return true;
-    
-  } catch (recoveryError) {
-    console.error(`[SW] ❌ Hata kurtarma başarısız: tab ${tabId}`, recoveryError);
-    return false;
-  }
-}
-
-// ================== HEALTH CHECK SYSTEM ==================
-
-// Sistem sağlık kontrolü
 async function performHealthCheck() {
-  console.log("[SW] 🏥 Sistem sağlık kontrolü başlatılıyor...");
+  console.log("[SW] 🏥 Health check...");
   
   const healthReport = {
     timestamp: Date.now(),
@@ -1006,7 +863,10 @@ async function performHealthCheck() {
       status: serviceWorkerState.isReady ? 'healthy' : 'unhealthy',
       uptime: Date.now() - serviceWorkerState.performanceMetrics.startTime,
       messageCount: serviceWorkerState.performanceMetrics.messageCount,
-      errorCount: serviceWorkerState.performanceMetrics.errorCount
+      errorCount: serviceWorkerState.performanceMetrics.errorCount,
+      authSuccessRate: serviceWorkerState.performanceMetrics.authAttempts > 0 
+        ? (serviceWorkerState.performanceMetrics.authSuccess / serviceWorkerState.performanceMetrics.authAttempts * 100).toFixed(1) + '%'
+        : '0%'
     },
     contentScripts: {
       injectedCount: serviceWorkerState.contentScriptInjected.size,
@@ -1020,21 +880,19 @@ async function performHealthCheck() {
     healthReport.issues.push("High error count detected");
   }
   
-  if (serviceWorkerState.performanceMetrics.messageCount === 0 && 
-      Date.now() - serviceWorkerState.performanceMetrics.startTime > 60000) {
-    healthReport.issues.push("No messages received in last minute");
+  if (serviceWorkerState.performanceMetrics.authFailures > serviceWorkerState.performanceMetrics.authSuccess) {
+    healthReport.issues.push("Auth failure rate is high");
   }
   
-  console.log("[SW] 🏥 Sağlık raporu:", healthReport);
+  console.log("[SW] 🏥 Health report:", healthReport);
   return healthReport;
 }
 
-// Periyodik sağlık kontrolü
-setInterval(performHealthCheck, 10 * 60 * 1000); // 10 dakikada bir
+// Health check (her 10 dakikada)
+setInterval(performHealthCheck, 10 * 60 * 1000);
 
 // ================== SYSTEM STATUS ==================
 
-// Sistem durumu kontrolü
 function getSystemStatus() {
   return {
     serviceWorker: {
@@ -1053,68 +911,145 @@ function getSystemStatus() {
   };
 }
 
-// Debug bilgileri için
+// ================== DEBUG INTERFACE ==================
+
+// Debug fonksiyonları
 if (typeof globalThis !== 'undefined') {
-  globalThis.getServiceWorkerStatus = getSystemStatus;
-  globalThis.getPerformanceReport = getPerformanceReport;
+  globalThis.serviceWorkerDebug = {
+    getState: () => serviceWorkerState,
+    getConfig: () => CONFIG,
+    performHealthCheck,
+    getSystemStatus,
+    getPerformanceReport,
+    clearContentScriptCache: () => {
+      serviceWorkerState.contentScriptInjected.clear();
+      console.log("[SW] 🧹 Content script cache cleared");
+    },
+    resetMetrics: () => {
+      serviceWorkerState.performanceMetrics = {
+        messageCount: 0,
+        errorCount: 0,
+        videoOperations: 0,
+        authAttempts: 0,
+        authSuccess: 0,
+        authFailures: 0,
+        lastActivity: Date.now(),
+        startTime: Date.now()
+      };
+      console.log("[SW] 📊 Metrics reset");
+    }
+  };
 }
 
-// ================== FINAL INITIALIZATION ==================
+// ================== EMERGENCY HANDLERS ==================
 
-// Son hazırlık işlemleri
-setTimeout(() => {
-  console.log("[SW] 🎯 Service worker tamamen hazır!");
+// Emergency reset handler
+chrome.runtime.onConnect.addListener((port) => {
+  console.log(`[SW] 🔌 Port connection: ${port.name}`);
   
-  // İlk sağlık kontrolü
-  performHealthCheck();
-  
-  // Extension bilgilerini logla
-  const extInfo = getExtensionInfo();
-  console.log(`[SW] 📋 Extension: ${extInfo.name} v${extInfo.version}`);
-  
-}, 1000);
-
-// Global hata yakalayıcı (son çare)
-if (typeof process !== 'undefined') {
-  process.on?.('uncaughtException', (error) => {
-    console.error('[SW] 💥 Uncaught Exception:', error);
-    serviceWorkerState.performanceMetrics.errorCount++;
+  port.onMessage.addListener((message) => {
+    if (message.action === 'emergency_reset') {
+      console.log("[SW] 🚨 Emergency reset initiated...");
+      
+      // Cache'leri temizle
+      serviceWorkerState.contentScriptInjected.clear();
+      
+      // Metrikleri sıfırla
+      serviceWorkerState.performanceMetrics = {
+        messageCount: 0,
+        errorCount: 0,
+        videoOperations: 0,
+        authAttempts: 0,
+        authSuccess: 0,
+        authFailures: 0,
+        lastActivity: Date.now(),
+        startTime: Date.now()
+      };
+      
+      port.postMessage({ success: true, message: "Reset completed" });
+    }
   });
-
-  process.on?.('unhandledRejection', (reason, promise) => {
-    console.error('[SW] 🚫 Unhandled Rejection at:', promise, 'reason:', reason);
-    serviceWorkerState.performanceMetrics.errorCount++;
+  
+  port.onDisconnect.addListener(() => {
+    console.log(`[SW] 🔌 Port disconnected: ${port.name}`);
   });
+});
+
+// ================== INITIALIZATION ==================
+
+// Service worker'ı başlat
+async function initializeServiceWorker() {
+  console.log("[SW] 🚀 Initializing service worker...");
+  
+  try {
+    // Ready state
+    serviceWorkerState.isReady = true;
+    
+    // Cache'leri temizle
+    serviceWorkerState.contentScriptInjected.clear();
+    
+    // Performance tracking başlat
+    serviceWorkerState.performanceMetrics.startTime = Date.now();
+    
+    console.log("[SW] ✅ Service worker initialization completed");
+    
+  } catch (error) {
+    console.error("[SW] ❌ Service worker initialization failed:", error);
+    serviceWorkerState.isReady = false;
+  }
 }
 
-// ================== FİNAL SETUP ==================
+// ================== EXTENSION LIFECYCLE ==================
 
-// Service worker hazır
-console.log("[SW] 🚀 CSP uyumlu service worker sistemi hazır!");
-console.log("[SW] 📋 Desteklenen özellikler:");
-console.log("  ✅ Gelişmiş video senkronizasyonu");
-console.log("  ✅ Google OAuth entegrasyonu");
-console.log("  ✅ Çoklu platform desteği");
-console.log("  ✅ Firebase real-time database");
-console.log("  ✅ Güvenli content script yönetimi");
-console.log("  ✅ CSP uyumlu Firebase entegrasyonu");
-console.log("  ✅ Comprehensive error handling");
-console.log("  ✅ Video sitesi otomatik algılama");
-console.log("  ✅ Timeout ve retry mekanizmaları");
-console.log("  ✅ Performance monitoring");
-console.log("  ✅ Health check system");
-console.log("  ✅ Advanced error recovery");
-console.log("  ✅ Emergency handlers");
+// Extension suspend
+chrome.runtime.onSuspend.addListener(() => {
+  console.log("[SW] 😴 Service worker suspending...");
+  
+  const finalReport = getPerformanceReport();
+  console.log("[SW] 📊 Final performance report:", finalReport);
+});
 
-serviceWorkerState.isReady = true;
+// Extension suspend cancelled
+chrome.runtime.onSuspendCanceled.addListener(() => {
+  console.log("[SW] 🔄 Service worker suspend cancelled");
+  serviceWorkerState.isReady = true;
+});
 
-console.log("[SW] 🚀✨ Service Worker tamamen yüklendi ve eksiksiz hale getirildi!");
-console.log("[SW] 📊 Debug fonksiyonları:");
-console.log("  - globalThis.getServiceWorkerStatus()");
-console.log("  - globalThis.getPerformanceReport()");
+// ================== FINAL SETUP ==================
+
+// Service worker'ı başlat
+initializeServiceWorker();
 
 // Final durum raporu
 setTimeout(() => {
   const finalStatus = getSystemStatus();
-  console.log("[SW] 🎉 Final sistem durumu:", finalStatus);
+  console.log("[SW] 🎉 Final system status:", finalStatus);
+  
+  console.log("[SW] 🚀✨ SERVICE WORKER FULLY LOADED!");
+  console.log("[SW] 📋 Ready features:");
+  console.log("  ✅ Email/Password Authentication");
+  console.log("  ✅ Google OAuth Authentication");
+  console.log("  ✅ Video Synchronization");
+  console.log("  ✅ Content Script Management");
+  console.log("  ✅ Firebase Integration");
+  console.log("  ✅ Performance Monitoring");
+  console.log("  ✅ Error Handling");
+  console.log("  ✅ Health Check System");
+  
 }, 2000);
+
+// Debug komutları
+console.log("[SW] 🔧 Debug commands:");
+console.log("  - globalThis.serviceWorkerDebug.getState()");
+console.log("  - globalThis.serviceWorkerDebug.performHealthCheck()");
+console.log("  - globalThis.serviceWorkerDebug.getSystemStatus()");
+console.log("  - globalThis.serviceWorkerDebug.clearContentScriptCache()");
+console.log("  - globalThis.serviceWorkerDebug.resetMetrics()");
+
+// Final ready message
+setTimeout(() => {
+  console.log("[SW] 🎯 SERVICE WORKER TAMAMEN HAZIR!");
+  console.log(`[SW] ⏰ Yükleme zamanı: ${new Date().toLocaleString('tr-TR')}`);
+  console.log(`[SW] 🔢 Extension versiyon: ${chrome.runtime.getManifest().version}`);
+  console.log("[SW] 🏁 Initialization complete - Ready for use!");
+}, 3000);

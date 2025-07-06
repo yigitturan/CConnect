@@ -1,7 +1,7 @@
-// ================== VIDEO SYNC APP v4 - ENGLISH VERSION ==================
+// ================== FIXED SIDEPANEL - AUTH ERRORS RESOLVED ==================
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 Video Sync App v4 starting...");
+  console.log("🚀 Fixed Video Sync App v4.1 starting...");
   
   // ================== GLOBAL STATE ==================
   
@@ -33,7 +33,12 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTimer: null,
     followerTimer: null,
     lastState: null,
-    syncing: false
+    syncing: false,
+    lastSyncTime: 0,
+    syncCooldown: 4000,
+    maxSyncDifference: 2.5,
+    consecutiveSyncs: 0,
+    maxConsecutiveSyncs: 2
   };
   
   // Chat system
@@ -56,14 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
         { 
           urls: [
             'stun:stun1.l.google.com:19302', 
-            'stun:stun2.l.google.com:19302',
-            'stun:stun3.l.google.com:19302'
+            'stun:stun2.l.google.com:19302'
           ] 
-        },
-        {
-          urls: 'turn:numb.viagenie.ca',
-          credential: 'muazkh',
-          username: 'webrtc@live.com'
         }
       ],
       iceCandidatePoolSize: 10
@@ -138,7 +137,7 @@ document.addEventListener("DOMContentLoaded", () => {
     videoStatus: document.getElementById("videoStatus")
   };
   
-  // ================== FIREBASE SETUP - CSP COMPLIANT ==================
+  // ================== FIREBASE SETUP - FIXED ==================
   
   const firebaseConfig = {
     apiKey: "AIzaSyB69u3UFUyEX0F237B7MKMRTm-mfSvEqJU",
@@ -153,34 +152,37 @@ document.addEventListener("DOMContentLoaded", () => {
   
   function initFirebase() {
     try {
-      // CSP compliant Firebase initialization
       if (typeof firebase === 'undefined') {
         console.error("❌ Firebase SDK not loaded");
+        showMessage("Firebase SDK could not be loaded. Please refresh the page.", true);
         return false;
       }
       
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
+        console.log("✅ Firebase app initialized");
       }
       
-      // Get database reference
       appState.database = firebase.database();
       
-      // CSP specific settings
       if (appState.database) {
-        // Force WebSocket usage (instead of long polling)
         appState.database.goOnline();
+        console.log("✅ Firebase database connected");
         
-        console.log("✅ Firebase initialized (CSP compliant)");
+        // Connection test
+        appState.database.ref('.info/connected').on('value', (snapshot) => {
+          const connected = snapshot.val();
+          console.log(`🔗 Firebase connection status: ${connected ? 'Connected' : 'Disconnected'}`);
+        });
+        
         return true;
       }
       
-      console.error("❌ Firebase database could not be initialized");
-      return false;
+      throw new Error("Firebase database could not be initialized");
       
     } catch (error) {
-      console.error("❌ Firebase error:", error);
-      showMessage("Firebase connection error!", true);
+      console.error("❌ Firebase initialization error:", error);
+      showMessage("Firebase connection failed. Please check your internet connection.", true);
       return false;
     }
   }
@@ -188,16 +190,69 @@ document.addEventListener("DOMContentLoaded", () => {
   // ================== UTILITY FUNCTIONS ==================
   
   function showMessage(message, isError = false) {
+    console.log(isError ? "❌" : "✅", message);
+    
     if (elements.statusEl) {
       elements.statusEl.textContent = message;
-      elements.statusEl.style.color = isError ? "#ef4444" : "#10b981";
+      elements.statusEl.className = isError ? "status-message error" : "status-message success";
       elements.statusEl.classList.remove("hidden");
+      
+      // Auto hide after 5 seconds
       setTimeout(() => {
-        elements.statusEl.textContent = "";
-        elements.statusEl.classList.add("hidden");
+        if (elements.statusEl) {
+          elements.statusEl.classList.add("hidden");
+          elements.statusEl.textContent = "";
+        }
       }, 5000);
     }
-    console.log(isError ? "❌" : "✅", message);
+    
+    // Create toast notification
+    createToastNotification(message, isError);
+  }
+  
+  function createToastNotification(message, isError = false) {
+    // Remove existing toast
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) {
+      existingToast.remove();
+    }
+    
+    // Create new toast
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${isError ? 'error' : 'success'}`;
+    toast.textContent = message;
+    
+    // Style the toast
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${isError ? '#ef4444' : '#10b981'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      max-width: 300px;
+      word-wrap: break-word;
+      animation: slideInRight 0.3s ease-out;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto remove
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 300);
+      }
+    }, 4000);
   }
   
   function updateSyncStatus(status) {
@@ -233,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
-  // ================== PASSWORD VALIDATION ==================
+  // ================== FIXED PASSWORD VALIDATION ==================
   
   function validatePassword(password) {
     const errors = [];
@@ -264,23 +319,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.signupPasswordInput) {
       elements.signupPasswordInput.addEventListener("input", () => {
         const password = elements.signupPasswordInput.value.trim();
-        const validation = validatePassword(password);
         
-        let errorElement = document.getElementById("password-requirements");
-        if (!errorElement) {
-          errorElement = document.createElement("div");
-          errorElement.id = "password-requirements";
-          errorElement.style.fontSize = "12px";
-          errorElement.style.marginTop = "5px";
-          elements.signupPasswordInput.parentNode.insertBefore(errorElement, elements.signupPasswordInput.nextSibling);
+        if (password.length === 0) {
+          elements.signupPasswordInput.setCustomValidity("");
+          return;
         }
+        
+        const validation = validatePassword(password);
         
         if (!validation.isValid) {
           elements.signupPasswordInput.setCustomValidity(validation.errors.join(", "));
-          errorElement.innerHTML = validation.errors.map(err => `<p style="color: #f59e0b; margin: 2px 0;">${err}</p>`).join("");
         } else {
           elements.signupPasswordInput.setCustomValidity("");
-          errorElement.innerHTML = "<p style='color: #10b981; margin: 2px 0;'>✓ Password requirements met</p>";
         }
       });
     }
@@ -296,14 +346,11 @@ document.addEventListener("DOMContentLoaded", () => {
       tab.addEventListener('click', () => {
         const targetTab = tab.dataset.tab;
         
-        // Deactivate all tabs
         navTabs.forEach(t => t.classList.remove('active'));
         tabContents.forEach(content => content.classList.add('hidden'));
         
-        // Activate selected tab
         tab.classList.add('active');
         
-        // Show related content
         switch(targetTab) {
           case 'rooms':
             if (elements.roomsSection) elements.roomsSection.classList.remove('hidden');
@@ -323,10 +370,10 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("📁 Tab navigation initialized");
   }
   
-  // ================== AUTH SYSTEM ==================
+  // ================== FIXED AUTH SYSTEM ==================
   
   function initAuth() {
-    // Screen transitions
+    // Screen navigation
     if (elements.showSignupLink) {
       elements.showSignupLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -343,35 +390,58 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    // Login
+    // Fixed Login
     if (elements.loginBtn) {
       elements.loginBtn.addEventListener("click", async () => {
         const email = elements.emailInput?.value?.trim();
         const password = elements.passwordInput?.value?.trim();
         
         if (!email || !password) {
-          showMessage("Email and password are required!", true);
+          showMessage("Please enter both email and password!", true);
           return;
         }
         
-        showMessage("Signing in...");
+        if (!isValidEmail(email)) {
+          showMessage("Please enter a valid email address!", true);
+          return;
+        }
+        
+        // Disable button during login
+        elements.loginBtn.disabled = true;
+        elements.loginBtn.textContent = "Signing in...";
         
         try {
+          showMessage("Signing in...");
+          
           const response = await sendToBackground("login", { email, password });
-          if (response.success) {
-            appState.currentUser = response.nickname;
+          
+          if (response && response.success) {
+            appState.currentUser = response.nickname || email.split('@')[0];
             showMainApp();
-            showMessage("Login successful!");
+            showMessage("Welcome back!");
           } else {
-            showMessage("Login error: " + (response.error || "Unknown error"), true);
+            const errorMsg = getReadableErrorMessage(response?.error);
+            showMessage(errorMsg, true);
           }
         } catch (error) {
-          showMessage("Login error!", true);
+          console.error("Login error:", error);
+          showMessage("Login failed. Please try again.", true);
+        } finally {
+          // Re-enable button
+          elements.loginBtn.disabled = false;
+          elements.loginBtn.innerHTML = `
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+              <polyline points="10,17 15,12 10,7"></polyline>
+              <line x1="15" y1="12" x2="3" y2="12"></line>
+            </svg>
+            <span>Sign In</span>
+          `;
         }
       });
     }
     
-    // Signup
+    // Fixed Signup
     if (elements.signupBtn) {
       elements.signupBtn.addEventListener("click", async () => {
         const email = elements.signupEmailInput?.value?.trim();
@@ -379,7 +449,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const nickname = elements.nicknameInput?.value?.trim();
         
         if (!email || !password || !nickname) {
-          showMessage("All fields are required!", true);
+          showMessage("Please fill in all fields!", true);
+          return;
+        }
+        
+        if (!isValidEmail(email)) {
+          showMessage("Please enter a valid email address!", true);
+          return;
+        }
+        
+        if (nickname.length < 2) {
+          showMessage("Nickname must be at least 2 characters!", true);
           return;
         }
         
@@ -389,39 +469,80 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         
-        showMessage("Creating account...");
+        // Disable button during signup
+        elements.signupBtn.disabled = true;
+        elements.signupBtn.textContent = "Creating account...";
         
         try {
+          showMessage("Creating your account...");
+          
           const response = await sendToBackground("signup", { email, password, nickname });
-          if (response.success) {
-            showMessage("Registration successful! You can now sign in.");
+          
+          if (response && response.success) {
+            showMessage("Account created successfully! You can now sign in.");
+            // Switch to login screen
             if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
             if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
+            // Pre-fill email
+            if (elements.emailInput) elements.emailInput.value = email;
           } else {
-            showMessage("Registration error: " + (response.error || "Unknown error"), true);
+            const errorMsg = getReadableErrorMessage(response?.error);
+            showMessage(errorMsg, true);
           }
         } catch (error) {
-          showMessage("Registration error!", true);
+          console.error("Signup error:", error);
+          showMessage("Account creation failed. Please try again.", true);
+        } finally {
+          // Re-enable button
+          elements.signupBtn.disabled = false;
+          elements.signupBtn.innerHTML = `
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span>Create Account</span>
+          `;
         }
       });
     }
     
-    // Google login
+    // Fixed Google Login
     if (elements.googleLoginBtn) {
       elements.googleLoginBtn.addEventListener("click", async () => {
-        showMessage("Signing in with Google...");
+        // Disable button during login
+        elements.googleLoginBtn.disabled = true;
+        elements.googleLoginBtn.textContent = "Signing in with Google...";
         
         try {
+          showMessage("Signing in with Google...");
+          
           const response = await sendToBackground("googleLogin");
-          if (response.success) {
-            appState.currentUser = response.nickname;
+          
+          if (response && response.success) {
+            appState.currentUser = response.nickname || "User";
             showMainApp();
-            showMessage("Google login successful!");
+            showMessage("Google sign-in successful!");
           } else {
-            showMessage("Google login error!", true);
+            const errorMsg = getReadableErrorMessage(response?.error);
+            showMessage(errorMsg, true);
           }
         } catch (error) {
-          showMessage("Google login error!", true);
+          console.error("Google login error:", error);
+          showMessage("Google sign-in failed. Please try again.", true);
+        } finally {
+          // Re-enable button
+          elements.googleLoginBtn.disabled = false;
+          elements.googleLoginBtn.innerHTML = `
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            <span>Google</span>
+          `;
         }
       });
     }
@@ -433,7 +554,54 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    console.log("🔐 Auth system initialized");
+    // Enter key support
+    if (elements.passwordInput) {
+      elements.passwordInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" && elements.loginBtn && !elements.loginBtn.disabled) {
+          elements.loginBtn.click();
+        }
+      });
+    }
+    
+    if (elements.signupPasswordInput) {
+      elements.signupPasswordInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" && elements.signupBtn && !elements.signupBtn.disabled) {
+          elements.signupBtn.click();
+        }
+      });
+    }
+    
+    console.log("🔐 Fixed auth system initialized");
+  }
+  
+  // ================== HELPER FUNCTIONS ==================
+  
+  function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+  
+  function getReadableErrorMessage(error) {
+    if (!error) return "An unknown error occurred. Please try again.";
+    
+    // Firebase error codes to readable messages
+    const errorMap = {
+      'EMAIL_EXISTS': 'An account with this email already exists.',
+      'OPERATION_NOT_ALLOWED': 'Email/password accounts are not enabled.',
+      'TOO_MANY_ATTEMPTS_TRY_LATER': 'Too many unsuccessful attempts. Please try again later.',
+      'EMAIL_NOT_FOUND': 'No account found with this email address.',
+      'INVALID_PASSWORD': 'The password is incorrect.',
+      'USER_DISABLED': 'This account has been disabled.',
+      'INVALID_EMAIL': 'The email address is invalid.',
+      'WEAK_PASSWORD': 'The password is too weak.',
+      'PASSWORD_VALIDATION_FAILED': 'Password does not meet requirements.',
+      'GOOGLE_AUTH_ERROR': 'Google sign-in failed. Please try again.',
+      'NETWORK_ERROR': 'Network error. Please check your connection.',
+      'AUTH_TIMEOUT': 'Authentication request timed out. Please try again.'
+    };
+    
+    const errorKey = typeof error === 'string' ? error : error.code || error.message;
+    return errorMap[errorKey] || `Error: ${errorKey}`;
   }
   
   function showMainApp() {
@@ -442,35 +610,410 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.appContainer) elements.appContainer.classList.remove("hidden");
     
     const welcomeMsg = document.getElementById("welcomeMsg");
-    if (welcomeMsg) welcomeMsg.textContent = `Hello, ${appState.currentUser}`;
+    if (welcomeMsg) welcomeMsg.textContent = `Hello, ${appState.currentUser}!`;
     
-    // Activate first tab
-    const firstTab = document.querySelector('.nav-tab');
-    if (firstTab) firstTab.click();
+    // Switch to rooms tab
+    const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
+    if (roomsTab) roomsTab.click();
+    
+    console.log("✅ Main app shown for user:", appState.currentUser);
   }
   
   function performLogout() {
-    cleanup();
-    appState.currentUser = "";
+    console.log("🚪 Performing logout...");
     
-    if (elements.appContainer) elements.appContainer.classList.add("hidden");
-    if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
-    
-    // Clear forms
-    if (elements.emailInput) elements.emailInput.value = "";
-    if (elements.passwordInput) elements.passwordInput.value = "";
-    
-    showMessage("Logged out successfully.");
+    try {
+      // Clean up all systems
+      cleanup();
+      
+      // Reset state
+      appState.currentUser = "";
+      
+      // Show login screen
+      if (elements.appContainer) elements.appContainer.classList.add("hidden");
+      if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
+      
+      // Clear inputs
+      if (elements.emailInput) elements.emailInput.value = "";
+      if (elements.passwordInput) elements.passwordInput.value = "";
+      if (elements.signupEmailInput) elements.signupEmailInput.value = "";
+      if (elements.signupPasswordInput) elements.signupPasswordInput.value = "";
+      if (elements.nicknameInput) elements.nicknameInput.value = "";
+      
+      showMessage("Logged out successfully.");
+      console.log("✅ Logout completed");
+    } catch (error) {
+      console.error("❌ Logout error:", error);
+      showMessage("Logout completed.", false); // Don't show error to user
+    }
   }
   
   async function sendToBackground(action, data = {}) {
+    return new Promise((resolve) => {
+      if (typeof chrome === 'undefined' || !chrome.runtime) {
+        console.error("Chrome runtime not available");
+        resolve({ success: false, error: "CHROME_RUNTIME_NOT_AVAILABLE" });
+        return;
+      }
+      
+      const timeout = setTimeout(() => {
+        console.error("Background script timeout");
+        resolve({ success: false, error: "BACKGROUND_SCRIPT_TIMEOUT" });
+      }, 30000); // 30 second timeout
+      
+      chrome.runtime.sendMessage({ action, ...data }, (response) => {
+        clearTimeout(timeout);
+        
+        if (chrome.runtime.lastError) {
+          console.error("Chrome runtime error:", chrome.runtime.lastError);
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+        } else {
+          resolve(response || { success: false, error: "NO_RESPONSE" });
+        }
+      });
+    });
+  }
+  
+  // ================== REMAINING SYSTEMS (UNCHANGED FOR NOW) ==================
+  
+  // Master-Follower System (keeping existing implementation)
+  async function startMasterFollowerSystem(roomId) {
+    console.log("👑 Starting Master-Follower system...");
+    
+    try {
+      masterSystem.active = true;
+      masterSystem.roomRef = appState.database.ref(`masterControl/${roomId}/currentMaster`);
+      masterSystem.usersRef = appState.database.ref(`masterControl/${roomId}/users`);
+      
+      await masterSystem.usersRef.child(appState.currentUser).set({
+        nickname: appState.currentUser,
+        online: true,
+        lastSeen: Date.now()
+      });
+      
+      masterSystem.usersRef.child(appState.currentUser).onDisconnect().remove();
+      
+      masterSystem.listener = masterSystem.roomRef.on('value', (snapshot) => {
+        const newMaster = snapshot.val();
+        
+        if (newMaster) {
+          masterSystem.currentMaster = newMaster;
+          masterSystem.iAmMaster = (newMaster === appState.currentUser);
+          updateMasterUI();
+          
+          console.log("👑 Master:", newMaster, "Am I master:", masterSystem.iAmMaster);
+        } else if (!masterSystem.currentMaster) {
+          setMaster(appState.currentUser);
+        }
+      });
+      
+      startHeartbeat();
+      updateMasterUI();
+      console.log("✅ Master-Follower system started");
+      
+    } catch (error) {
+      console.error("❌ Master-Follower startup error:", error);
+      showMessage("Master system error!", true);
+    }
+  }
+  
+  function startHeartbeat() {
+    masterSystem.heartbeatTimer = setInterval(async () => {
+      if (masterSystem.active && masterSystem.usersRef) {
+        try {
+          await masterSystem.usersRef.child(appState.currentUser).update({
+            lastSeen: Date.now(),
+            online: true
+          });
+        } catch (error) {
+          console.error("Heartbeat error:", error);
+        }
+      }
+    }, 5000);
+  }
+  
+  async function setMaster(nickname) {
+    try {
+      await masterSystem.roomRef.set(nickname);
+      console.log("👑 Master set:", nickname);
+    } catch (error) {
+      console.error("Master setting error:", error);
+    }
+  }
+  
+  function updateMasterUI() {
+    if (elements.masterStatus) {
+      elements.masterStatus.textContent = masterSystem.iAmMaster ? "👑 YOU ARE MASTER" : "👤 Follower";
+      elements.masterStatus.style.color = masterSystem.iAmMaster ? "#ffd700" : "#888";
+      elements.masterStatus.style.fontWeight = masterSystem.iAmMaster ? "bold" : "normal";
+    }
+    
+    if (elements.currentMaster) {
+      elements.currentMaster.textContent = masterSystem.currentMaster || "---";
+    }
+    
+    if (videoSync.active) {
+      console.log("🔄 Role changed, restarting timers");
+      videoSync.syncing = false;
+      videoSync.lastSyncTime = 0;
+      videoSync.consecutiveSyncs = 0;
+      startRoleBasedTimers();
+    }
+  }
+  
+  function stopMasterFollowerSystem() {
+    if (masterSystem.active) {
+      masterSystem.active = false;
+      
+      if (masterSystem.heartbeatTimer) {
+        clearInterval(masterSystem.heartbeatTimer);
+        masterSystem.heartbeatTimer = null;
+      }
+      
+      if (masterSystem.listener && masterSystem.roomRef) {
+        masterSystem.roomRef.off('value', masterSystem.listener);
+        masterSystem.listener = null;
+      }
+      
+      if (masterSystem.usersRef && appState.currentUser) {
+        masterSystem.usersRef.child(appState.currentUser).remove();
+      }
+      
+      masterSystem.currentMaster = "";
+      masterSystem.iAmMaster = false;
+      
+      if (elements.masterStatus) elements.masterStatus.textContent = "---";
+      if (elements.currentMaster) elements.currentMaster.textContent = "---";
+      
+      console.log("🛑 Master-Follower system stopped");
+    }
+  }
+
+  // ================== VIDEO SYNC SYSTEM ==================
+  
+  async function startVideoSync(roomId) {
+    console.log("🎬 Starting Enhanced Video Sync...");
+    
+    try {
+      videoSync.active = true;
+      videoSync.roomRef = appState.database.ref(`videoSync/${roomId}/states`);
+      videoSync.myRef = videoSync.roomRef.child(appState.currentUser);
+      
+      videoSync.syncing = false;
+      videoSync.lastSyncTime = 0;
+      videoSync.consecutiveSyncs = 0;
+      
+      if (videoSync.listener) {
+        videoSync.roomRef.off('value', videoSync.listener);
+      }
+      videoSync.listener = videoSync.roomRef.on('value', handleVideoStateChange);
+      
+      startRoleBasedTimers();
+      
+      updateSyncStatus("🎬 Video sync active");
+      console.log("✅ Enhanced Video sync started");
+      
+    } catch (error) {
+      console.error("❌ Video sync startup error:", error);
+      updateSyncStatus("❌ Video sync error");
+    }
+  }
+
+  function startRoleBasedTimers() {
+    if (videoSync.updateTimer) {
+      clearInterval(videoSync.updateTimer);
+      videoSync.updateTimer = null;
+    }
+    
+    if (videoSync.followerTimer) {
+      clearInterval(videoSync.followerTimer);
+      videoSync.followerTimer = null;
+    }
+    
+    if (masterSystem.iAmMaster) {
+      videoSync.updateTimer = setInterval(async () => {
+        if (!videoSync.active || !masterSystem.iAmMaster) return;
+        
+        try {
+          const videoState = await getVideoState();
+          if (videoState.success) {
+            const masterData = {
+              currentTime: Number(videoState.currentTime.toFixed(2)) || 0,
+              paused: Boolean(videoState.paused),
+              url: videoState.videoUrl || "",
+              timestamp: Date.now(),
+              isMaster: true,
+              nickname: appState.currentUser
+            };
+            
+            if (!videoSync.lastState || 
+                Math.abs(masterData.currentTime - videoSync.lastState.currentTime) > 0.8 ||
+                masterData.paused !== videoSync.lastState.paused) {
+              
+              await videoSync.myRef.set(masterData);
+              videoSync.lastState = masterData;
+              updateVideoTimes(masterData.currentTime, 0);
+              
+              console.log("📤 Master broadcast:", masterData.currentTime, masterData.paused);
+            }
+          }
+        } catch (error) {
+          console.error("Master broadcast error:", error);
+        }
+      }, 2000);
+      
+    } else {
+      videoSync.followerTimer = setInterval(async () => {
+        if (!videoSync.active || masterSystem.iAmMaster) return;
+        
+        try {
+          const videoState = await getVideoState();
+          if (videoState.success) {
+            const followerData = {
+              currentTime: Number(videoState.currentTime.toFixed(2)),
+              paused: Boolean(videoState.paused),
+              url: videoState.videoUrl || "",
+              timestamp: Date.now(),
+              isMaster: false,
+              nickname: appState.currentUser
+            };
+            
+            await videoSync.myRef.set(followerData);
+          }
+        } catch (error) {
+          console.error("Follower report error:", error);
+        }
+      }, 4000);
+    }
+    
+    console.log(`🔄 Timers started - Role: ${masterSystem.iAmMaster ? 'Master 👑' : 'Follower 👤'}`);
+  }
+
+  function findMasterState(states) {
+    for (const nickname in states) {
+      if (states[nickname].isMaster) {
+        return states[nickname];
+      }
+    }
+    return null;
+  }
+
+  function handleVideoStateChange(snapshot) {
+    if (!snapshot.exists()) return;
+    
+    try {
+      const states = snapshot.val();
+      
+      if (masterSystem.iAmMaster) {
+        const myState = states[appState.currentUser];
+        if (myState) {
+          updateVideoTimes(myState.currentTime, 0);
+        }
+        return;
+      }
+      
+      const masterState = findMasterState(states);
+      const myState = states[appState.currentUser];
+      
+      if (!masterState) {
+        console.log("⚠️ Master state not found");
+        return;
+      }
+      
+      if (!myState) {
+        console.log("⚠️ My state not found");
+        return;
+      }
+      
+      updateVideoTimes(myState.currentTime, masterState.currentTime);
+      safeSyncToMaster(masterState, myState);
+      
+    } catch (error) {
+      console.error("Video state change error:", error);
+    }
+  }
+
+  async function safeSyncToMaster(masterState, myState) {
+    if (videoSync.syncing) {
+      return;
+    }
+    
+    const now = Date.now();
+    if (now - videoSync.lastSyncTime < 4000) {
+      return;
+    }
+    
+    const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
+    const pauseDiff = myState.paused !== masterState.paused;
+    
+    const needsTimeSync = timeDiff > 3.0;
+    const needsPauseSync = pauseDiff;
+    
+    if (!needsTimeSync && !needsPauseSync) {
+      updateSyncStatus(`✅ Synced - ${timeDiff.toFixed(1)}s diff`);
+      return;
+    }
+    
+    console.log("🔄 SAFE SYNC:", {
+      timeDiff: timeDiff.toFixed(2),
+      pauseDiff,
+      masterTime: masterState.currentTime,
+      myTime: myState.currentTime
+    });
+    
+    videoSync.syncing = true;
+    videoSync.lastSyncTime = now;
+    
+    try {
+      updateSyncStatus("🔄 Syncing...");
+      
+      if (pauseDiff) {
+        if (masterState.paused && !myState.paused) {
+          console.log("⏸️ Pausing to match master");
+          await executeVideoAction('pauseVideo');
+          await sleep(400);
+        } else if (!masterState.paused && myState.paused) {
+          console.log("▶️ Playing to match master");
+          await executeVideoAction('playVideo');
+          await sleep(400);
+        }
+      }
+      
+      if (needsTimeSync) {
+        console.log(`⏭️ Time sync: ${myState.currentTime}s → ${masterState.currentTime}s`);
+        const success = await executeVideoAction('setVideoTime', masterState.currentTime);
+        
+        if (success) {
+          console.log("✅ Time sync successful");
+          updateSyncStatus("✅ Time synced!");
+        } else {
+          console.log("❌ Time sync failed");
+          updateSyncStatus("❌ Sync failed");
+        }
+      } else {
+        console.log("✅ Pause sync successful");
+        updateSyncStatus("✅ State synced!");
+      }
+      
+    } catch (error) {
+      console.error("Sync error:", error);
+      updateSyncStatus("❌ Sync error");
+    } finally {
+      setTimeout(() => {
+        videoSync.syncing = false;
+        console.log("🔓 Sync flag cleared");
+      }, 3000);
+    }
+  }
+  
+  async function getVideoState() {
     return new Promise((resolve) => {
       if (typeof chrome === 'undefined' || !chrome.runtime) {
         resolve({ success: false, error: "Chrome runtime not available" });
         return;
       }
       
-      chrome.runtime.sendMessage({ action, ...data }, (response) => {
+      chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
         if (chrome.runtime.lastError) {
           resolve({ success: false, error: chrome.runtime.lastError.message });
         } else {
@@ -478,6 +1021,62 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     });
+  }
+  
+  async function executeVideoAction(action, value = null) {
+    return new Promise((resolve) => {
+      if (typeof chrome === 'undefined' || !chrome.runtime) {
+        resolve(false);
+        return;
+      }
+      
+      const message = { action };
+      if (value !== null) message.currentTime = value;
+      
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(`Video action ${action} error:`, chrome.runtime.lastError);
+          resolve(false);
+        } else {
+          resolve(response?.success || false);
+        }
+      });
+    });
+  }
+  
+  function stopVideoSync() {
+    if (videoSync.active) {
+      videoSync.active = false;
+      
+      if (videoSync.updateTimer) {
+        clearInterval(videoSync.updateTimer);
+        videoSync.updateTimer = null;
+      }
+      
+      if (videoSync.followerTimer) {
+        clearInterval(videoSync.followerTimer);
+        videoSync.followerTimer = null;
+      }
+      
+      if (videoSync.listener && videoSync.roomRef) {
+        videoSync.roomRef.off('value', videoSync.listener);
+        videoSync.listener = null;
+      }
+      
+      if (videoSync.myRef) {
+        videoSync.myRef.remove();
+      }
+      
+      videoSync.lastState = null;
+      videoSync.syncing = false;
+      videoSync.lastSyncTime = 0;
+      videoSync.consecutiveSyncs = 0;
+      
+      updateSyncStatus("⏸️ Video sync stopped");
+      updateVideoTimes(0, 0);
+      
+      console.log("🛑 Video sync stopped");
+    }
   }
   
   // ================== ROOM MANAGEMENT ==================
@@ -556,11 +1155,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (elements.currentVideoCode) elements.currentVideoCode.textContent = code;
             if (elements.videoContainer) elements.videoContainer.classList.remove("hidden");
             
-            // Switch to video tab
             const videoTab = document.querySelector('.nav-tab[data-tab="video"]');
             if (videoTab) videoTab.click();
             
-            // Start systems
             await startMasterFollowerSystem(code);
             await startVideoSync(code);
             
@@ -590,7 +1187,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (elements.currentChatCode) elements.currentChatCode.textContent = code;
             if (elements.chatContainer) elements.chatContainer.classList.remove("hidden");
             
-            // Switch to chat tab
             const chatTab = document.querySelector('.nav-tab[data-tab="chat"]');
             if (chatTab) chatTab.click();
             
@@ -617,7 +1213,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
         if (elements.videoCodeInput) elements.videoCodeInput.value = "";
         
-        // Return to rooms tab
         const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
         if (roomsTab) roomsTab.click();
         
@@ -634,7 +1229,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
         if (elements.chatCodeInput) elements.chatCodeInput.value = "";
         
-        // Return to rooms tab
         const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
         if (roomsTab) roomsTab.click();
         
@@ -667,161 +1261,8 @@ document.addEventListener("DOMContentLoaded", () => {
     showMessage(successMessage);
   }
   
-  // ================== MASTER-FOLLOWER SYSTEM ==================
+  // ================== MASTER TOGGLE ==================
   
-  async function startMasterFollowerSystem(roomId) {
-    console.log("👑 Starting Master-Follower system...");
-    
-    try {
-      masterSystem.active = true;
-      masterSystem.roomRef = appState.database.ref(`masterControl/${roomId}/currentMaster`);
-      masterSystem.usersRef = appState.database.ref(`masterControl/${roomId}/users`);
-      
-      // Register user
-      await masterSystem.usersRef.child(appState.currentUser).set({
-        nickname: appState.currentUser,
-        online: true,
-        lastSeen: Date.now()
-      });
-      
-      // Disconnect handler
-      masterSystem.usersRef.child(appState.currentUser).onDisconnect().remove();
-      
-      // Listen for master changes
-      masterSystem.listener = masterSystem.roomRef.on('value', (snapshot) => {
-        const newMaster = snapshot.val();
-        
-        if (newMaster) {
-          masterSystem.currentMaster = newMaster;
-          masterSystem.iAmMaster = (newMaster === appState.currentUser);
-          updateMasterUI();
-          
-          console.log("👑 Master:", newMaster, "Am I master:", masterSystem.iAmMaster);
-        } else if (!masterSystem.currentMaster) {
-          // First joiner becomes master
-          setMaster(appState.currentUser);
-        }
-      });
-      
-      // Start heartbeat
-      startHeartbeat();
-      
-      updateMasterUI();
-      console.log("✅ Master-Follower system started");
-      
-    } catch (error) {
-      console.error("❌ Master-Follower startup error:", error);
-      showMessage("Master system error!", true);
-    }
-  }
-  
-  function startHeartbeat() {
-    masterSystem.heartbeatTimer = setInterval(async () => {
-      if (masterSystem.active && masterSystem.usersRef) {
-        try {
-          await masterSystem.usersRef.child(appState.currentUser).update({
-            lastSeen: Date.now(),
-            online: true
-          });
-        } catch (error) {
-          console.error("Heartbeat error:", error);
-        }
-      }
-    }, 5000); // Every 5 seconds
-  }
-  
-  async function setMaster(nickname) {
-    try {
-      await masterSystem.roomRef.set(nickname);
-      console.log("👑 Master set:", nickname);
-    } catch (error) {
-      console.error("Master setting error:", error);
-    }
-  }
-  
-  function updateMasterUI() {
-    if (elements.masterStatus) {
-      elements.masterStatus.textContent = masterSystem.iAmMaster ? "👑 YOU ARE MASTER" : "👤 Follower";
-      elements.masterStatus.style.color = masterSystem.iAmMaster ? "#ffd700" : "#888";
-      elements.masterStatus.style.fontWeight = masterSystem.iAmMaster ? "bold" : "normal";
-    }
-    
-    if (elements.currentMaster) {
-      elements.currentMaster.textContent = masterSystem.currentMaster || "---";
-    }
-    
-    if (elements.masterToggleBtn) {
-      elements.masterToggleBtn.innerHTML = `
-        <span class="btn-icon">👑</span>
-        <span class="btn-text">Switch Master</span>
-      `;
-    }
-    
-    // When master changes, restart follower timer
-    if (videoSync.active) {
-      // Clear previous follower timer
-      if (videoSync.followerTimer) {
-        clearInterval(videoSync.followerTimer);
-        videoSync.followerTimer = null;
-      }
-      
-      // If I'm now a follower, start timer
-      if (!masterSystem.iAmMaster) {
-        videoSync.followerTimer = setInterval(async () => {
-          if (!videoSync.active) return;
-          
-          try {
-            const videoState = await getVideoState();
-            if (videoState.success) {
-              const data = {
-                currentTime: Math.round(videoState.currentTime * 10) / 10,
-                paused: videoState.paused,
-                url: videoState.url || "",
-                timestamp: Date.now(),
-                isMaster: false,
-                nickname: appState.currentUser
-              };
-              
-              await videoSync.myRef.set(data);
-            }
-          } catch (error) {
-            console.error("Follower state sharing error:", error);
-          }
-        }, 3000);
-      }
-    }
-  }
-  
-  function stopMasterFollowerSystem() {
-    if (masterSystem.active) {
-      masterSystem.active = false;
-      
-      if (masterSystem.heartbeatTimer) {
-        clearInterval(masterSystem.heartbeatTimer);
-        masterSystem.heartbeatTimer = null;
-      }
-      
-      if (masterSystem.listener && masterSystem.roomRef) {
-        masterSystem.roomRef.off('value', masterSystem.listener);
-        masterSystem.listener = null;
-      }
-      
-      if (masterSystem.usersRef && appState.currentUser) {
-        masterSystem.usersRef.child(appState.currentUser).remove();
-      }
-      
-      masterSystem.currentMaster = "";
-      masterSystem.iAmMaster = false;
-      
-      // Reset UI
-      if (elements.masterStatus) elements.masterStatus.textContent = "---";
-      if (elements.currentMaster) elements.currentMaster.textContent = "---";
-      
-      console.log("🛑 Master-Follower system stopped");
-    }
-  }
-  
-  // Master toggle
   function initMasterToggle() {
     if (elements.masterToggleBtn) {
       elements.masterToggleBtn.addEventListener("click", async () => {
@@ -854,244 +1295,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  // ================== VIDEO SYNC SYSTEM ==================
-  
-  async function startVideoSync(roomId) {
-    console.log("🎬 Starting video sync...");
-    
-    try {
-      videoSync.active = true;
-      videoSync.roomRef = appState.database.ref(`videoSync/${roomId}/states`);
-      videoSync.myRef = videoSync.roomRef.child(appState.currentUser);
-      
-      // Master state sharing
-      videoSync.updateTimer = setInterval(async () => {
-        if (!videoSync.active || !masterSystem.iAmMaster || videoSync.syncing) return;
-        
-        try {
-          const videoState = await getVideoState();
-          if (videoState.success) {
-            const data = {
-              currentTime: Math.round(videoState.currentTime * 10) / 10,
-              paused: videoState.paused,
-              url: videoState.url || "",
-              timestamp: Date.now(),
-              isMaster: true
-            };
-            
-            // Compare with previous state
-            if (!videoSync.lastState || 
-                Math.abs(data.currentTime - videoSync.lastState.currentTime) > 1 ||
-                data.paused !== videoSync.lastState.paused ||
-                data.url !== videoSync.lastState.url) {
-              
-              await videoSync.myRef.set(data);
-              videoSync.lastState = data;
-              updateVideoTimes(data.currentTime, 0);
-              
-              console.log("📤 Master state sent:", data.currentTime, data.paused);
-            }
-          }
-        } catch (error) {
-          console.error("Video sync sharing error:", error);
-        }
-      }, 2000);
-      
-      // Follower listening
-      videoSync.listener = videoSync.roomRef.on('value', (snapshot) => {
-        if (!snapshot.exists() || videoSync.syncing) return;
-        
-        try {
-          const states = snapshot.val();
-          
-          if (masterSystem.iAmMaster) {
-            // Master: Only show own state
-            const myState = states[appState.currentUser];
-            if (myState) {
-              updateVideoTimes(myState.currentTime, 0);
-            }
-          } else {
-            // Follower: Show both master and self
-            const masterState = Object.values(states || {}).find(state => 
-              state.isMaster && state.nickname !== appState.currentUser
-            );
-            
-            const myState = states[appState.currentUser];
-            
-            if (masterState && myState) {
-              updateVideoTimes(myState.currentTime, masterState.currentTime);
-              syncToMaster(masterState);
-            } else if (masterState) {
-              updateVideoTimes(0, masterState.currentTime);
-              syncToMaster(masterState);
-            }
-          }
-        } catch (error) {
-          console.error("Video sync listening error:", error);
-        }
-      });
-      
-      // Followers also share their state (for display only)
-      if (!masterSystem.iAmMaster) {
-        videoSync.followerTimer = setInterval(async () => {
-          if (!videoSync.active) return;
-          
-          try {
-            const videoState = await getVideoState();
-            if (videoState.success) {
-              const data = {
-                currentTime: Math.round(videoState.currentTime * 10) / 10,
-                paused: videoState.paused,
-                url: videoState.url || "",
-                timestamp: Date.now(),
-                isMaster: false,
-                nickname: appState.currentUser
-              };
-              
-              await videoSync.myRef.set(data);
-            }
-          } catch (error) {
-            console.error("Follower state sharing error:", error);
-          }
-        }, 3000); // Followers update every 3 seconds
-      }
-      
-      updateSyncStatus("🎬 Video sync active");
-      console.log("✅ Video sync started");
-      
-    } catch (error) {
-      console.error("❌ Video sync startup error:", error);
-      updateSyncStatus("❌ Video sync error");
-    }
-  }
-  
-  async function syncToMaster(masterState) {
-    if (videoSync.syncing) return;
-    
-    try {
-      videoSync.syncing = true;
-      
-      const myState = await getVideoState();
-      if (!myState.success) return;
-      
-      const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
-      const pauseDiff = myState.paused !== masterState.paused;
-      
-      console.log("🔍 Sync check:", {
-        myTime: myState.currentTime,
-        masterTime: masterState.currentTime,
-        timeDiff: timeDiff.toFixed(1),
-        pauseDiff
-      });
-      
-      if (timeDiff > 2 || pauseDiff) {
-        console.log("🔄 Syncing to master...");
-        updateSyncStatus("🔄 Synchronizing...");
-        
-        // Set pause/play state
-        if (pauseDiff) {
-          if (masterState.paused && !myState.paused) {
-            await executeVideoAction('pauseVideo');
-            await sleep(300);
-          } else if (!masterState.paused && myState.paused) {
-            await executeVideoAction('playVideo');
-            await sleep(300);
-          }
-        }
-        
-        // Set time difference
-        if (timeDiff > 3) {
-          await executeVideoAction('setVideoTime', masterState.currentTime);
-          await sleep(500);
-        }
-        
-        updateSyncStatus("✅ Synchronized");
-        console.log("✅ Synchronization complete");
-        
-      } else {
-        updateSyncStatus("✅ In Sync - " + timeDiff.toFixed(1) + "s diff");
-      }
-    } catch (error) {
-      console.error("Sync error:", error);
-      updateSyncStatus("❌ Sync error");
-    } finally {
-      setTimeout(() => {
-        videoSync.syncing = false;
-      }, 1000);
-    }
-  }
-  
-  async function getVideoState() {
-    return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.runtime) {
-        resolve({ success: false, error: "Chrome runtime not available" });
-        return;
-      }
-      
-      chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          resolve(response || { success: false });
-        }
-      });
-    });
-  }
-  
-  async function executeVideoAction(action, value = null) {
-    return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.runtime) {
-        resolve(false);
-        return;
-      }
-      
-      const message = { action };
-      if (value !== null) message.currentTime = value;
-      
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(`Video action ${action} error:`, chrome.runtime.lastError);
-          resolve(false);
-        } else {
-          resolve(response?.success || false);
-        }
-      });
-    });
-  }
-  
-  function stopVideoSync() {
-    if (videoSync.active) {
-      videoSync.active = false;
-      
-      if (videoSync.updateTimer) {
-        clearInterval(videoSync.updateTimer);
-        videoSync.updateTimer = null;
-      }
-      
-      if (videoSync.followerTimer) {
-        clearInterval(videoSync.followerTimer);
-        videoSync.followerTimer = null;
-      }
-      
-      if (videoSync.listener && videoSync.roomRef) {
-        videoSync.roomRef.off('value', videoSync.listener);
-        videoSync.listener = null;
-      }
-      
-      if (videoSync.myRef) {
-        videoSync.myRef.remove();
-      }
-      
-      videoSync.lastState = null;
-      videoSync.syncing = false;
-      
-      updateSyncStatus("⏸️ Video sync stopped");
-      updateVideoTimes(0, 0);
-      
-      console.log("🛑 Video sync stopped");
-    }
-  }
-  
   // ================== CHAT SYSTEM ==================
   
   function startChatSystem(roomId) {
@@ -1101,7 +1304,6 @@ document.addEventListener("DOMContentLoaded", () => {
       chatSystem.active = true;
       chatSystem.messagesRef = appState.database.ref(`chatMessages/${roomId}`);
       
-      // Listen for messages
       chatSystem.listener = chatSystem.messagesRef.on("value", (snapshot) => {
         if (elements.messagesContainer) {
           elements.messagesContainer.innerHTML = "";
@@ -1113,11 +1315,20 @@ document.addEventListener("DOMContentLoaded", () => {
               .forEach(([key, message]) => displayMessage(message));
             
             scrollToBottom();
+          } else {
+            // Show empty state
+            elements.messagesContainer.innerHTML = `
+              <div class="empty-state">
+                <svg class="empty-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <p class="empty-text">No messages yet.<br>Start the conversation!</p>
+              </div>
+            `;
           }
         }
       });
       
-      // Setup message sending
       setupMessageSending();
       
       console.log("✅ Chat system started");
@@ -1129,17 +1340,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   function setupMessageSending() {
-    // Send button
     if (elements.sendMessageBtn) {
       elements.sendMessageBtn.onclick = sendMessage;
     }
     
-    // Enter key
     if (elements.messageInput) {
       elements.messageInput.onkeypress = (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
           sendMessage();
+        }
+      };
+      
+      // Character counter
+      elements.messageInput.oninput = () => {
+        const current = elements.messageInput.value.length;
+        const max = 500;
+        const counter = document.querySelector('.character-counter');
+        if (counter) {
+          counter.textContent = `${current}/${max} characters`;
+          counter.style.color = current > max * 0.9 ? '#ef4444' : '#888';
         }
       };
     }
@@ -1149,6 +1369,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const message = elements.messageInput?.value?.trim();
     if (!message || !chatSystem.active) return;
     
+    if (message.length > 500) {
+      showMessage("Message too long! Maximum 500 characters.", true);
+      return;
+    }
+    
     try {
       await chatSystem.messagesRef.push({
         sender: appState.currentUser,
@@ -1157,6 +1382,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       
       if (elements.messageInput) elements.messageInput.value = "";
+      
+      // Update character counter
+      const counter = document.querySelector('.character-counter');
+      if (counter) {
+        counter.textContent = '0/500 characters';
+        counter.style.color = '#888';
+      }
       
     } catch (error) {
       console.error("Message sending error:", error);
@@ -1168,15 +1400,43 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!elements.messagesContainer) return;
     
     const messageEl = document.createElement("div");
-    messageEl.textContent = `${message.sender}: ${message.text}`;
-    messageEl.className = message.sender === appState.currentUser ? "sent-message" : "received-message";
+    messageEl.className = `message ${message.sender === appState.currentUser ? 'sent' : 'received'}`;
     
-    // User color
-    const colors = ["#8b5cf6", "#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
-    const colorIndex = message.sender.charCodeAt(0) % colors.length;
-    messageEl.style.backgroundColor = colors[colorIndex];
+    const senderEl = document.createElement("div");
+    senderEl.className = "message-sender";
+    senderEl.textContent = message.sender;
+    
+    const textEl = document.createElement("div");
+    textEl.className = "message-text";
+    textEl.textContent = message.text;
+    
+    const timeEl = document.createElement("div");
+    timeEl.className = "message-time";
+    timeEl.textContent = formatMessageTime(message.timestamp);
+    
+    messageEl.appendChild(senderEl);
+    messageEl.appendChild(textEl);
+    messageEl.appendChild(timeEl);
     
     elements.messagesContainer.appendChild(messageEl);
+  }
+  
+  function formatMessageTime(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    if (diff < 60000) { // Less than 1 minute
+      return 'Just now';
+    } else if (diff < 3600000) { // Less than 1 hour
+      const minutes = Math.floor(diff / 60000);
+      return `${minutes}m ago`;
+    } else if (diff < 86400000) { // Less than 1 day
+      const hours = Math.floor(diff / 3600000);
+      return `${hours}h ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
   }
   
   function scrollToBottom() {
@@ -1202,7 +1462,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  // ================== WEBRTC VIDEO CHAT ==================
+  // ================== WEBRTC SYSTEM ==================
   
   function initWebRTC() {
     if (!elements.startButton || !elements.hangupButton) return;
@@ -1228,7 +1488,6 @@ document.addEventListener("DOMContentLoaded", () => {
         updateVideoStatus("Call started");
         updateMediaButtons();
         
-        // Start WebRTC signaling
         if (appState.currentVideoRoom) {
           await setupWebRTCSignaling(appState.currentVideoRoom);
         }
@@ -1237,6 +1496,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Camera startup error:", error);
         updateVideoStatus("Camera/microphone access error: " + error.message);
         elements.startButton.disabled = false;
+        showMessage("Camera access denied. Please allow camera and microphone access.", true);
       }
     };
     
@@ -1282,14 +1542,11 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       webrtcSystem.roomRef = appState.database.ref(`webrtcRooms/${roomId}`);
       
-      // Check if room exists
       const roomSnapshot = await webrtcSystem.roomRef.once('value');
       
       if (!roomSnapshot.exists()) {
-        // Create room (caller)
         await createWebRTCRoom();
       } else {
-        // Join room (callee)
         await joinWebRTCRoom();
       }
       
@@ -1306,24 +1563,20 @@ document.addEventListener("DOMContentLoaded", () => {
       webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
       setupPeerConnectionEvents();
       
-      // Add local stream
       if (webrtcSystem.localStream) {
         webrtcSystem.localStream.getTracks().forEach(track => {
           webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
         });
       }
       
-      // Start ICE candidates first
       collectICECandidates('caller', 'callee');
       
-      // Create offer
       const offer = await webrtcSystem.peerConnection.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
       await webrtcSystem.peerConnection.setLocalDescription(offer);
       
-      // Save to Firebase
       await webrtcSystem.roomRef.set({
         offer: {
           type: offer.type,
@@ -1332,7 +1585,6 @@ document.addEventListener("DOMContentLoaded", () => {
         created: Date.now()
       });
       
-      // Listen for answer
       webrtcSystem.roomRef.on('value', async (snapshot) => {
         const data = snapshot.val();
         if (data?.answer && webrtcSystem.peerConnection.signalingState === 'have-local-offer') {
@@ -1370,25 +1622,20 @@ document.addEventListener("DOMContentLoaded", () => {
       webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
       setupPeerConnectionEvents();
       
-      // Add local stream
       if (webrtcSystem.localStream) {
         webrtcSystem.localStream.getTracks().forEach(track => {
           webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
         });
       }
       
-      // Start ICE candidates first
       collectICECandidates('callee', 'caller');
       
-      // Set remote description
       const offer = new RTCSessionDescription(roomData.offer);
       await webrtcSystem.peerConnection.setRemoteDescription(offer);
       
-      // Create answer
       const answer = await webrtcSystem.peerConnection.createAnswer();
       await webrtcSystem.peerConnection.setLocalDescription(answer);
       
-      // Save answer to Firebase
       await webrtcSystem.roomRef.update({
         answer: {
           type: answer.type,
@@ -1407,13 +1654,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function setupPeerConnectionEvents() {
     if (!webrtcSystem.peerConnection) return;
     
-    // Remote stream
     webrtcSystem.remoteStream = new MediaStream();
     if (elements.remoteVideo) {
       elements.remoteVideo.srcObject = webrtcSystem.remoteStream;
     }
     
-    // Track events
     webrtcSystem.peerConnection.ontrack = (event) => {
       console.log("Remote track received");
       event.streams[0].getTracks().forEach(track => {
@@ -1421,7 +1666,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     };
     
-    // Connection state
     webrtcSystem.peerConnection.onconnectionstatechange = () => {
       const state = webrtcSystem.peerConnection.connectionState;
       console.log("Connection state:", state);
@@ -1444,7 +1688,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const localCandidatesRef = webrtcSystem.roomRef.child(`${localName}Candidates`);
     const remoteCandidatesRef = webrtcSystem.roomRef.child(`${remoteName}Candidates`);
     
-    // Send local ICE candidates
     webrtcSystem.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         console.log(`📡 ${localName} ICE candidate sending`);
@@ -1454,7 +1697,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
     
-    // Listen for remote ICE candidates
     remoteCandidatesRef.on('child_added', async (snapshot) => {
       const candidateData = snapshot.val();
       console.log(`📡 ${remoteName} ICE candidate received`);
@@ -1470,7 +1712,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   function updateMediaButtons() {
-    // Camera button
     if (elements.cameraToggle) {
       const cameraOn = elements.cameraToggle.querySelector('.camera-on');
       const cameraOff = elements.cameraToggle.querySelector('.camera-off');
@@ -1490,7 +1731,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Microphone button
     if (elements.micToggle) {
       const micOn = elements.micToggle.querySelector('.mic-on');
       const micOff = elements.micToggle.querySelector('.mic-off');
@@ -1519,7 +1759,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   function stopWebRTC() {
-    // Stop streams
     if (webrtcSystem.localStream) {
       webrtcSystem.localStream.getTracks().forEach(track => track.stop());
       webrtcSystem.localStream = null;
@@ -1530,23 +1769,19 @@ document.addEventListener("DOMContentLoaded", () => {
       webrtcSystem.remoteStream = null;
     }
     
-    // Close peer connection
     if (webrtcSystem.peerConnection) {
       webrtcSystem.peerConnection.close();
       webrtcSystem.peerConnection = null;
     }
     
-    // Clean Firebase listeners
     if (webrtcSystem.roomRef) {
       webrtcSystem.roomRef.off();
       webrtcSystem.roomRef = null;
     }
     
-    // Clear video elements
     if (elements.localVideo) elements.localVideo.srcObject = null;
     if (elements.remoteVideo) elements.remoteVideo.srcObject = null;
     
-    // Reset buttons
     if (elements.startButton) elements.startButton.disabled = false;
     if (elements.hangupButton) elements.hangupButton.disabled = true;
     
@@ -1562,59 +1797,62 @@ document.addEventListener("DOMContentLoaded", () => {
   function cleanup() {
     console.log("🧹 Cleaning up...");
     
-    stopVideoSync();
-    stopMasterFollowerSystem();
-    stopChatSystem();
-    stopWebRTC();
-    
-    // Reset state
-    appState.currentVideoRoom = "";
-    appState.currentChatRoom = "";
-    
-    // Reset UI
-    resetUI();
-    
-    console.log("✅ Cleanup completed");
+    try {
+      stopVideoSync();
+      stopMasterFollowerSystem();
+      stopChatSystem();
+      stopWebRTC();
+      
+      appState.currentVideoRoom = "";
+      appState.currentChatRoom = "";
+      
+      resetUI();
+      
+      console.log("✅ Cleanup completed");
+    } catch (error) {
+      console.error("❌ Cleanup error:", error);
+    }
   }
   
   function resetUI() {
-    // Code fields
-    if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
-    if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
-    if (elements.videoCodeInput) elements.videoCodeInput.value = "";
-    if (elements.chatCodeInput) elements.chatCodeInput.value = "";
-    
-    // Containers
-    if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
-    if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
-    if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.add("hidden");
-    if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.add("hidden");
-    
-    // Status
-    updateSyncStatus("⏸️ Synchronization off");
-    updateVideoTimes(0, 0);
-    
-    if (elements.masterStatus) elements.masterStatus.textContent = "---";
-    if (elements.currentMaster) elements.currentMaster.textContent = "---";
-    if (elements.videoStatus) elements.videoStatus.textContent = "Click to start call";
-    
-    // Generated codes
-    if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = "-";
-    if (elements.generatedChatCode) elements.generatedChatCode.textContent = "-";
+    try {
+      if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
+      if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
+      if (elements.videoCodeInput) elements.videoCodeInput.value = "";
+      if (elements.chatCodeInput) elements.chatCodeInput.value = "";
+      
+      if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
+      if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
+      if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.add("hidden");
+      if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.add("hidden");
+      
+      updateSyncStatus("⏸️ Synchronization off");
+      updateVideoTimes(0, 0);
+      
+      if (elements.masterStatus) elements.masterStatus.textContent = "---";
+      if (elements.currentMaster) elements.currentMaster.textContent = "---";
+      if (elements.videoStatus) elements.videoStatus.textContent = "Ready to start video call";
+      
+      if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = "------";
+      if (elements.generatedChatCode) elements.generatedChatCode.textContent = "------";
+    } catch (error) {
+      console.error("UI reset error:", error);
+    }
   }
   
   // ================== STARTUP SYSTEM ==================
   
   function initApp() {
-    console.log("🚀 Video Sync App v4 starting...");
+    console.log("🚀 Fixed Video Sync App v4.1 starting...");
     
     try {
-      // Initialize Firebase
+      // Add CSS animations for toast notifications
+      addToastStyles();
+      
       if (!initFirebase()) {
         throw new Error("Firebase could not be initialized");
       }
       
-      // Start systems in order
       setupPasswordValidation();
       initTabNavigation();
       initAuth();
@@ -1622,87 +1860,190 @@ document.addEventListener("DOMContentLoaded", () => {
       initMasterToggle();
       initWebRTC();
       
-      // Initial UI state
       setInitialUIState();
-      
-      // Global event listeners
       setupGlobalEventListeners();
       
       appState.initialized = true;
-      console.log("✅ App successfully started");
-      showMessage("Video Sync App ready!");
+      console.log("✅ Fixed app successfully started");
+      showMessage("Video Sync App ready! Please sign in to continue.");
       
     } catch (error) {
       console.error("❌ App startup error:", error);
-      showMessage("Application startup error: " + error.message, true);
+      showMessage("Application startup error. Please refresh the page.", true);
     }
   }
   
+  function addToastStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      
+      @keyframes slideOutRight {
+        from {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+      }
+      
+      .status-message {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-top: 12px;
+      }
+      
+      .status-message.success {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+      }
+      
+      .status-message.error {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+      }
+      
+      .message {
+        margin-bottom: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        max-width: 80%;
+      }
+      
+      .message.sent {
+        background-color: #6366f1;
+        color: white;
+        margin-left: auto;
+      }
+      
+      .message.received {
+        background-color: #f3f4f6;
+        color: #374151;
+      }
+      
+      .message-sender {
+        font-size: 12px;
+        font-weight: 600;
+        opacity: 0.8;
+        margin-bottom: 4px;
+      }
+      
+      .message-text {
+        font-size: 14px;
+        line-height: 1.4;
+        word-wrap: break-word;
+      }
+      
+      .message-time {
+        font-size: 11px;
+        opacity: 0.6;
+        margin-top: 4px;
+      }
+      
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        text-align: center;
+        opacity: 0.6;
+      }
+      
+      .empty-icon {
+        margin-bottom: 16px;
+        opacity: 0.5;
+      }
+      
+      .empty-text {
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
   function setInitialUIState() {
-    // Auth screens
-    if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
-    if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
-    if (elements.appContainer) elements.appContainer.classList.add("hidden");
-    
-    // Containers
-    if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
-    if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
-    
-    // Rooms section active
-    if (elements.roomsSection) elements.roomsSection.classList.remove("hidden");
-    
-    // Activate first tab
-    const firstTab = document.querySelector('.nav-tab[data-tab="rooms"]');
-    if (firstTab) firstTab.classList.add('active');
-    
-    // Reset status
-    resetUI();
-    
-    console.log("🎨 Initial UI state set");
+    try {
+      if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
+      if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
+      if (elements.appContainer) elements.appContainer.classList.add("hidden");
+      
+      if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
+      if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
+      
+      if (elements.roomsSection) elements.roomsSection.classList.remove("hidden");
+      
+      const firstTab = document.querySelector('.nav-tab[data-tab="rooms"]');
+      if (firstTab) firstTab.classList.add('active');
+      
+      resetUI();
+      
+      console.log("🎨 Initial UI state set");
+    } catch (error) {
+      console.error("UI initialization error:", error);
+    }
   }
   
   function setupGlobalEventListeners() {
-    // Global error handling
-    window.addEventListener('error', (event) => {
-      console.error("🚨 Global error:", event.error);
-      showMessage("System error occurred!", true);
-    });
-    
-    window.addEventListener('unhandledrejection', (event) => {
-      console.error("🚨 Promise rejection:", event.reason);
-      showMessage("Connection error!", true);
-    });
-    
-    // Cleanup on page close
-    window.addEventListener('beforeunload', () => {
-      console.log("📄 Page closing, cleaning up...");
-      cleanup();
-    });
-    
-    // Visibility change - tab switching
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        console.log("👁️ Tab hidden");
-      } else {
-        console.log("👁️ Tab visible");
-        // Refresh heartbeat
-        if (masterSystem.active && masterSystem.usersRef) {
-          masterSystem.usersRef.child(appState.currentUser).update({
-            lastSeen: Date.now(),
-            online: true
-          });
+    try {
+      window.addEventListener('error', (event) => {
+        console.error("🚨 Global error:", event.error);
+        serviceWorkerState.performanceMetrics.errorCount++;
+      });
+      
+      window.addEventListener('unhandledrejection', (event) => {
+        console.error("🚨 Promise rejection:", event.reason);
+        event.preventDefault();
+      });
+      
+      window.addEventListener('beforeunload', () => {
+        console.log("📄 Page closing, cleaning up...");
+        cleanup();
+      });
+      
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          console.log("👁️ Tab hidden");
+        } else {
+          console.log("👁️ Tab visible");
+          if (masterSystem.active && masterSystem.usersRef && appState.currentUser) {
+            masterSystem.usersRef.child(appState.currentUser).update({
+              lastSeen: Date.now(),
+              online: true
+            }).catch(error => {
+              console.error("Heartbeat update error:", error);
+            });
+          }
         }
-      }
-    });
-    
-    console.log("🔧 Global event listeners set up");
+      });
+      
+      console.log("🔧 Global event listeners set up");
+    } catch (error) {
+      console.error("Event listener setup error:", error);
+    }
   }
   
-  // ================== GLOBAL API ==================
+  // ================== GLOBAL API AND DEBUG ==================
   
-  // Global API for debugging and control
   window.videoSyncApp = {
-    version: "4.0.0",
+    version: "4.1.0-fixed-auth",
     appState,
     masterSystem,
     videoSync,
@@ -1710,12 +2051,11 @@ document.addEventListener("DOMContentLoaded", () => {
     webrtcSystem,
     elements,
     
-    // Functions
     cleanup,
     showMessage,
     updateSyncStatus,
+    performLogout,
     
-    // Debug functions
     getStatus: () => ({
       initialized: appState.initialized,
       currentUser: appState.currentUser,
@@ -1724,21 +2064,62 @@ document.addEventListener("DOMContentLoaded", () => {
       masterActive: masterSystem.active,
       videoSyncActive: videoSync.active,
       chatActive: chatSystem.active,
-      iAmMaster: masterSystem.iAmMaster
+      iAmMaster: masterSystem.iAmMaster,
+      syncing: videoSync.syncing,
+      lastSyncTime: videoSync.lastSyncTime,
+      consecutiveSyncs: videoSync.consecutiveSyncs
     }),
     
-    forceSync: () => {
-      if (videoSync.active && !masterSystem.iAmMaster) {
-        console.log("🔄 Manual sync triggered...");
-        // Trigger manual sync
-      }
+    resetSync: () => {
+      videoSync.syncing = false;
+      videoSync.lastSyncTime = 0;
+      videoSync.consecutiveSyncs = 0;
+      console.log("🔄 Sync state manually reset");
+      updateSyncStatus("🔄 Sync reset");
+    },
+    
+    // Emergency reset function
+    emergencyReset: () => {
+      console.log("🚨 Emergency reset initiated");
+      cleanup();
+      location.reload();
+    }
+  };
+
+  window.authDebug = {
+    testLogin: async (email, password) => {
+      console.log("🧪 Testing login:", email);
+      return await sendToBackground("login", { email, password });
+    },
+    
+    testSignup: async (email, password, nickname) => {
+      console.log("🧪 Testing signup:", email);
+      return await sendToBackground("signup", { email, password, nickname });
+    },
+    
+    checkElements: () => {
+      const elementsStatus = {};
+      Object.keys(elements).forEach(key => {
+        elementsStatus[key] = !!elements[key];
+      });
+      console.log("🔍 Elements status:", elementsStatus);
+      return elementsStatus;
+    },
+    
+    getFirebaseStatus: () => {
+      return {
+        configured: !!appState.database,
+        connected: appState.database ? "Unknown" : false
+      };
     }
   };
   
   // Start the app
   initApp();
   
-  console.log("🎉 Video Sync App v4 fully loaded!");
-  console.log("📋 For debugging: window.videoSyncApp");
+  console.log("🎉 Fixed Video Sync App v4.1 fully loaded!");
+  console.log("📋 For debugging: window.videoSyncApp.getStatus()");
+  console.log("🔧 Auth debugging: window.authDebug.checkElements()");
+  console.log("🚨 Emergency reset: window.videoSyncApp.emergencyReset()");
   
 });

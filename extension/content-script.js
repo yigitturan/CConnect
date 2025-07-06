@@ -1,6 +1,6 @@
-// ================== CONTENT SCRIPT - TAM VE EKSİKSİZ VERSİYON ==================
+// ================== CONTENT SCRIPT - TAMAMEN TAMİR EDİLMİŞ VERSİYON ==================
 
-console.log("[ContentScript] 🚀 Video senkronizasyon content script yüklendi");
+console.log("[ContentScript] 🚀 Tamamen tamir edilmiş video senkronizasyon content script yükleniyor...");
 
 // ================== GLOBAL DEĞİŞKENLER VE YAPILANDIRMA ==================
 
@@ -11,7 +11,11 @@ let contentScriptState = {
   videoObserver: null,
   urlObserver: null,
   isProcessing: false,
-  debugMode: true
+  debugMode: true,
+  lastSeekTime: 0,        // Son seek zamanı
+  seekCooldown: 3000,     // 3 saniye seek cooldown
+  isSeeking: false,       // Şu anda seek yapılıyor mu?
+  seekThreshold: 2.0      // Sadece 2+ saniye farkta seek yap
 };
 
 // Performans ve güvenilirlik ayarları
@@ -27,10 +31,11 @@ const CONTENT_CONFIG = {
 // Debug logging fonksiyonu
 function log(message, data = null) {
   if (contentScriptState.debugMode) {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
     if (data) {
-      console.log(message, data);
+      console.log(`[CS ${timestamp}] ${message}`, data);
     } else {
-      console.log(message);
+      console.log(`[CS ${timestamp}] ${message}`);
     }
   }
 }
@@ -40,16 +45,16 @@ function log(message, data = null) {
 // Video bulma algoritması - geliştirilmiş
 function findActiveVideo() {
   const startTime = performance.now();
-  log("[ContentScript] 🔍 Aktif video aranıyor...");
+  log("🔍 Aktif video aranıyor...");
   
   const videos = document.querySelectorAll('video');
   
   if (videos.length === 0) {
-    log("[ContentScript] ❌ Sayfada video bulunamadı");
+    log("❌ Sayfada video bulunamadı");
     return null;
   }
   
-  log(`[ContentScript] 📺 ${videos.length} video elementi bulundu`);
+  log(`📺 ${videos.length} video elementi bulundu`);
   
   let bestVideo = null;
   let highestScore = 0;
@@ -58,27 +63,27 @@ function findActiveVideo() {
   for (const video of videos) {
     try {
       const score = calculateVideoScore(video);
-      log(`[ContentScript] 📊 Video skoru:`, {
-        score: score,
+      log(`📊 Video skoru: ${score}`, {
         currentTime: video.currentTime,
         duration: video.duration,
         paused: video.paused,
         readyState: video.readyState,
-        dimensions: `${video.videoWidth}x${video.videoHeight}`
+        dimensions: `${video.videoWidth}x${video.videoHeight}`,
+        visible: isVideoVisible(video)
       });
       
-      if (score > highestScore) {
+      if (score > highestScore && score > 500) { // Minimum threshold eklendi
         highestScore = score;
         bestVideo = video;
       }
     } catch (error) {
-      log(`[ContentScript] ⚠️ Video skorlama hatası:`, error);
+      log(`⚠️ Video skorlama hatası:`, error);
     }
   }
   
   if (bestVideo) {
     const endTime = performance.now();
-    log(`[ContentScript] ✅ En uygun video seçildi (${(endTime - startTime).toFixed(1)}ms):`, {
+    log(`✅ En uygun video seçildi (${(endTime - startTime).toFixed(1)}ms):`, {
       score: highestScore,
       currentTime: bestVideo.currentTime,
       duration: bestVideo.duration,
@@ -87,8 +92,9 @@ function findActiveVideo() {
     });
     
     contentScriptState.currentVideo = bestVideo;
+    setupVideoEventListeners(bestVideo);
   } else {
-    log("[ContentScript] ❌ Uygun video bulunamadı");
+    log("❌ Uygun video bulunamadı");
   }
   
   return bestVideo;
@@ -106,66 +112,143 @@ function calculateVideoScore(video) {
     
     // 2. Oynatılma durumu (en yüksek puan)
     if (!video.paused && video.currentTime > 0 && video.readyState >= 3) {
-      score += 2000; // Çok yüksek puan
+      score += 3000; // Çok yüksek puan
     } else if (video.currentTime > 0) {
-      score += 1000; // Yine yüksek ama biraz daha az
+      score += 1500; // Yine yüksek ama biraz daha az
     }
     
     // 3. Hazırlık durumu
     if (video.readyState >= 3) { // HAVE_FUTURE_DATA veya üzeri
-      score += 500;
+      score += 800;
     } else if (video.readyState >= 2) { // HAVE_CURRENT_DATA
-      score += 300;
+      score += 400;
     }
     
     // 4. Video boyutları ve görünürlük
     const rect = video.getBoundingClientRect();
     if (rect.width > 200 && rect.height > 150) {
-      score += 400;
+      score += 600;
       
       // Viewport içinde görünürlük kontrolü
-      const visibleArea = calculateVisibleArea(rect);
-      score += Math.floor(visibleArea * 200); // 0-200 arası bonus
+      if (isVideoVisible(video)) {
+        score += 400;
+      }
     }
     
     // 5. Video süresi
     if (video.duration && video.duration > 10) {
-      score += 200;
+      score += 300;
       
       // Uzun videolar için bonus
       if (video.duration > 60) {
-        score += 100;
+        score += 200;
       }
     }
     
     // 6. Ses durumu
     if (!video.muted && video.volume > 0) {
-      score += 100;
+      score += 150;
     }
     
     // 7. Platform özel bonuslar
     const playerType = detectPlayerType();
     if (isMainPlayerVideo(video, playerType)) {
-      score += 800; // Çok yüksek platform bonusu
+      score += 1000; // Çok yüksek platform bonusu
     }
     
     // 8. Z-index ve CSS görünürlük
     const computedStyle = window.getComputedStyle(video);
     if (computedStyle.visibility === 'visible' && computedStyle.display !== 'none') {
-      score += 150;
+      score += 200;
     }
     
     // 9. Video kaynağı var mı
     if (video.src || video.currentSrc || video.querySelectorAll('source').length > 0) {
-      score += 200;
+      score += 300;
     }
     
   } catch (error) {
-    log(`[ContentScript] ⚠️ Skorlama hatası:`, error);
+    log(`⚠️ Skorlama hatası:`, error);
     return 0;
   }
   
   return score;
+}
+
+// Video görünürlük kontrolü
+function isVideoVisible(video) {
+  try {
+    const rect = video.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Viewport içinde mi?
+    const inViewport = (
+      rect.top < viewportHeight &&
+      rect.bottom > 0 &&
+      rect.left < viewportWidth &&
+      rect.right > 0
+    );
+    
+    if (!inViewport) return false;
+    
+    // CSS görünürlük
+    const style = window.getComputedStyle(video);
+    if (style.visibility === 'hidden' || style.display === 'none' || style.opacity === '0') {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Video event listener'ları kurma
+function setupVideoEventListeners(video) {
+  // Mevcut listener'ları temizle
+  video.removeEventListener('timeupdate', onVideoTimeUpdate);
+  video.removeEventListener('play', onVideoStateChange);
+  video.removeEventListener('pause', onVideoStateChange);
+  video.removeEventListener('seeked', onVideoStateChange);
+  
+  // Yeni listener'ları ekle
+  video.addEventListener('timeupdate', onVideoTimeUpdate);
+  video.addEventListener('play', onVideoStateChange);
+  video.addEventListener('pause', onVideoStateChange);
+  video.addEventListener('seeked', onVideoStateChange);
+  
+  log("🎧 Video event listener'ları kuruldu");
+}
+
+function onVideoTimeUpdate(event) {
+  // Throttle updates to prevent spam
+  const now = Date.now();
+  if (now - contentScriptState.lastVideoCheck < 500) {
+    return;
+  }
+  contentScriptState.lastVideoCheck = now;
+}
+
+function onVideoStateChange(event) {
+  const video = event.target;
+  log(`🎬 Video durum değişikliği: ${event.type}`, {
+    currentTime: video.currentTime,
+    paused: video.paused
+  });
+  
+  // Background'a bildir
+  try {
+    chrome.runtime.sendMessage({
+      action: "videoStateChanged",
+      eventType: event.type,
+      currentTime: video.currentTime,
+      paused: video.paused,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    // Ignore errors
+  }
 }
 
 // Görünür alan hesaplama
@@ -209,12 +292,12 @@ function detectPlayerType() {
   
   for (const platform of platforms) {
     if (platform.test(url, hostname)) {
-      log(`[ContentScript] 🎯 Platform algılandı: ${platform.type}`);
+      log(`🎯 Platform algılandı: ${platform.type}`);
       return platform.type;
     }
   }
   
-  log("[ContentScript] 🔧 Generic platform");
+  log("🔧 Generic platform");
   return "generic";
 }
 
@@ -225,16 +308,19 @@ function isMainPlayerVideo(video, playerType) {
       case "youtube":
         return video.closest('.html5-video-player') !== null ||
                video.closest('#movie_player') !== null ||
-               video.id === 'video-stream';
+               video.id === 'video-stream' ||
+               video.classList.contains('video-stream');
       
       case "netflix":
         return video.closest('.watch-video') !== null || 
                video.getAttribute('data-uia') === 'video-canvas' ||
-               video.closest('.NFPlayer') !== null;
+               video.closest('.NFPlayer') !== null ||
+               video.classList.contains('nf-video-player');
       
       case "vimeo":
         return video.closest('.vp-video-wrapper') !== null ||
-               video.closest('.player') !== null;
+               video.closest('.player') !== null ||
+               video.classList.contains('vp-video');
       
       case "twitch":
         return video.closest('.video-player') !== null ||
@@ -263,7 +349,7 @@ function isMainPlayerVideo(video, playerType) {
                video.closest('[data-testid*="video"]') !== null;
     }
   } catch (error) {
-    log(`[ContentScript] ⚠️ Main player kontrolü hatası:`, error);
+    log(`⚠️ Main player kontrolü hatası:`, error);
     return false;
   }
 }
@@ -272,11 +358,11 @@ function isMainPlayerVideo(video, playerType) {
 
 // Chrome extension mesaj dinleyicisi
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  log(`[ContentScript] 📨 Mesaj alındı:`, request);
+  log(`📨 Mesaj alındı:`, { action: request?.action });
   
   // Mesaj validasyonu
   if (!request || typeof request.action !== 'string') {
-    log(`[ContentScript] ⚠️ Geçersiz mesaj formatı:`, request);
+    log(`⚠️ Geçersiz mesaj formatı:`, request);
     sendResponse({ success: false, error: "INVALID_MESSAGE_FORMAT" });
     return false;
   }
@@ -302,7 +388,12 @@ async function handleMessage(request, sendResponse) {
   try {
     switch (action) {
       case "ping":
-        sendResponse({ success: true, pong: true, ready: contentScriptState.isReady });
+        sendResponse({ 
+          success: true, 
+          pong: true, 
+          ready: contentScriptState.isReady,
+          timestamp: Date.now()
+        });
         break;
         
       case "getVideoInfo":
@@ -322,11 +413,11 @@ async function handleMessage(request, sendResponse) {
         break;
         
       default:
-        log(`[ContentScript] ❓ Bilinmeyen action: ${action}`);
+        log(`❓ Bilinmeyen action: ${action}`);
         sendResponse({ success: false, error: "UNKNOWN_ACTION", action });
     }
   } catch (error) {
-    log(`[ContentScript] 💥 Mesaj işleme hatası:`, error);
+    log(`💥 Mesaj işleme hatası:`, error);
     sendResponse({ 
       success: false, 
       error: "MESSAGE_PROCESSING_ERROR", 
@@ -347,7 +438,7 @@ async function handleGetVideoInfo(sendResponse) {
     const activeVideo = findActiveVideo();
     
     if (!activeVideo) {
-      log("[ContentScript] ❌ Aktif video bulunamadı");
+      log("❌ Aktif video bulunamadı");
       sendResponse({ 
         success: false, 
         error: "NO_ACTIVE_VIDEO",
@@ -361,9 +452,9 @@ async function handleGetVideoInfo(sendResponse) {
     // Video bilgilerini topla
     const videoInfo = {
       success: true,
-      currentTime: activeVideo.currentTime || 0,
-      duration: activeVideo.duration || 0,
-      paused: activeVideo.paused,
+      currentTime: Number(activeVideo.currentTime.toFixed(3)) || 0,
+      duration: Number(activeVideo.duration.toFixed(3)) || 0,
+      paused: Boolean(activeVideo.paused),
       videoUrl: window.location.href,
       pageTitle: document.title,
       playerType: detectPlayerType(),
@@ -375,10 +466,11 @@ async function handleGetVideoInfo(sendResponse) {
       videoWidth: activeVideo.videoWidth || 0,
       videoHeight: activeVideo.videoHeight || 0,
       ended: activeVideo.ended || false,
-      seeking: activeVideo.seeking || false
+      seeking: activeVideo.seeking || false,
+      timestamp: Date.now()
     };
     
-    log("[ContentScript] ✅ Video bilgileri toplandı:", {
+    log("✅ Video bilgileri toplandı:", {
       currentTime: videoInfo.currentTime,
       duration: videoInfo.duration,
       paused: videoInfo.paused,
@@ -389,7 +481,7 @@ async function handleGetVideoInfo(sendResponse) {
     sendResponse(videoInfo);
     
   } catch (error) {
-    log("[ContentScript] ❌ Video bilgisi alma hatası:", error);
+    log("❌ Video bilgisi alma hatası:", error);
     sendResponse({
       success: false,
       error: "GET_VIDEO_INFO_ERROR",
@@ -398,15 +490,42 @@ async function handleGetVideoInfo(sendResponse) {
   }
 }
 
-// ================== VIDEO ZAMAN AYARLAMA ==================
+// ================== VIDEO ZAMAN AYARLAMA - DÖNGÜ ÖNLEYİCİ İLE ==================
 
 async function handleSetVideoTime(request, sendResponse) {
   const targetTime = parseFloat(request.currentTime);
+  const now = Date.now();
   
-  log(`[ContentScript] ⏭️ Video zamanı ayarlanıyor: ${targetTime}s`);
+  log(`⏭️ Video zamanı ayarlanıyor: ${targetTime}s`);
   
   try {
-    // Validasyon
+    // *** DÖNGÜ ÖNLEYİCİ KONTROLLER ***
+    
+    // 1. Şu anda seek yapılıyor mu kontrol et
+    if (contentScriptState.isSeeking) {
+      log("🚫 Zaten seek yapılıyor, istek reddediliyor");
+      sendResponse({ 
+        success: false, 
+        error: "SEEK_IN_PROGRESS",
+        message: "Seek zaten devam ediyor"
+      });
+      return;
+    }
+    
+    // 2. Cooldown period kontrol et
+    if (now - contentScriptState.lastSeekTime < contentScriptState.seekCooldown) {
+      const remainingCooldown = contentScriptState.seekCooldown - (now - contentScriptState.lastSeekTime);
+      log(`⏳ Seek cooldown aktif, ${remainingCooldown}ms kaldı`);
+      sendResponse({ 
+        success: false, 
+        error: "SEEK_COOLDOWN",
+        message: `Seek cooldown aktif`,
+        remainingMs: remainingCooldown
+      });
+      return;
+    }
+    
+    // 3. Hedef zaman validasyonu
     if (isNaN(targetTime) || targetTime < 0) {
       sendResponse({ 
         success: false, 
@@ -426,37 +545,66 @@ async function handleSetVideoTime(request, sendResponse) {
       return;
     }
     
-    // Zaman ayarlama işlemini gerçekleştir
+    // 4. Seek'in gerçekten gerekli olup olmadığını kontrol et
+    const currentTime = activeVideo.currentTime;
+    const timeDiff = Math.abs(currentTime - targetTime);
+    
+    if (timeDiff < contentScriptState.seekThreshold) {
+      log(`✅ Zaman farkı çok küçük (${timeDiff.toFixed(2)}s), seek gerekli değil`);
+      sendResponse({
+        success: true,
+        message: "Zaman zaten senkronize",
+        targetTime: targetTime,
+        actualTime: currentTime,
+        timeDifference: timeDiff,
+        skipped: true
+      });
+      return;
+    }
+    
+    // *** KORUNMALI SEEK İŞLEMİ GERÇEKLEŞTİR ***
+    
+    contentScriptState.isSeeking = true;
+    contentScriptState.lastSeekTime = now;
+    
+    log(`🎯 Seek yapılıyor: ${currentTime.toFixed(2)}s → ${targetTime.toFixed(2)}s (fark: ${timeDiff.toFixed(2)}s)`);
+    
     const success = await performSetTime(activeVideo, targetTime);
     
-    // Sonuç kontrolü
+    // Seek'in tamamlanması için bekle
     await sleep(CONTENT_CONFIG.STATE_CHECK_DELAY);
-    const finalTime = activeVideo.currentTime;
-    const timeDiff = Math.abs(finalTime - targetTime);
     
-    log(`[ContentScript] ⏱️ Zaman ayarlama sonucu:`, {
+    const finalTime = activeVideo.currentTime;
+    const finalDiff = Math.abs(finalTime - targetTime);
+    
+    log(`⏱️ Seek sonucu:`, {
       target: targetTime,
       actual: finalTime,
-      diff: timeDiff,
-      success: success && timeDiff < 2
+      diff: finalDiff,
+      success: success && finalDiff < 3
     });
     
     sendResponse({
-      success: success && timeDiff < 2,
+      success: success && finalDiff < 3,
       message: success ? "Video zamanı ayarlandı" : "Video zamanı ayarlanamadı",
       targetTime: targetTime,
       actualTime: finalTime,
-      timeDifference: timeDiff,
+      timeDifference: finalDiff,
       playerType: detectPlayerType()
     });
     
   } catch (error) {
-    log("[ContentScript] ❌ Video zaman ayarlama hatası:", error);
+    log("❌ Video zaman ayarlama hatası:", error);
     sendResponse({
       success: false,
       error: "SET_TIME_ERROR",
       details: error.message
     });
+  } finally {
+    // Her zaman seeking flag'ini temizle
+    setTimeout(() => {
+      contentScriptState.isSeeking = false;
+    }, 1000);
   }
 }
 
@@ -468,7 +616,7 @@ async function performSetTime(video, targetTime) {
     // Platform özel zaman ayarlama dene
     const platformSuccess = await tryPlatformSpecificSeek(playerType, targetTime, video);
     if (platformSuccess) {
-      log("[ContentScript] ✅ Platform özel seek başarılı");
+      log("✅ Platform özel seek başarılı");
       return true;
     }
     
@@ -476,7 +624,7 @@ async function performSetTime(video, targetTime) {
     return await tryDirectVideoSeek(video, targetTime);
     
   } catch (error) {
-    log("[ContentScript] ❌ Zaman ayarlama hatası:", error);
+    log("❌ Zaman ayarlama hatası:", error);
     return false;
   }
 }
@@ -495,7 +643,7 @@ async function tryPlatformSpecificSeek(playerType, targetTime, video) {
         return false;
     }
   } catch (error) {
-    log(`[ContentScript] ❌ Platform özel seek hatası (${playerType}):`, error);
+    log(`❌ Platform özel seek hatası (${playerType}):`, error);
     return false;
   }
 }
@@ -507,10 +655,10 @@ async function handleYouTubeSeek(targetTime) {
     try {
       window.ytplayer.seekTo(targetTime, true);
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ YouTube API seek başarılı");
+      log("✅ YouTube API seek başarılı");
       return true;
     } catch (error) {
-      log("[ContentScript] ⚠️ YouTube API seek hatası:", error);
+      log("⚠️ YouTube API seek hatası:", error);
     }
   }
   
@@ -523,12 +671,12 @@ async function handleYouTubeSeek(targetTime) {
         if (player && typeof player.seekTo === 'function') {
           player.seekTo(targetTime, true);
           await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-          log("[ContentScript] ✅ YouTube internal API seek başarılı");
+          log("✅ YouTube internal API seek başarılı");
           return true;
         }
       }
     } catch (error) {
-      log("[ContentScript] ⚠️ YouTube internal API seek hatası:", error);
+      log("⚠️ YouTube internal API seek hatası:", error);
     }
   }
   
@@ -566,12 +714,12 @@ async function handleNetflixSeek(targetTime, video) {
         progressBar.dispatchEvent(clickEvent);
         await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
         
-        log("[ContentScript] ✅ Netflix progress bar seek başarılı");
+        log("✅ Netflix progress bar seek başarılı");
         return true;
       }
     }
   } catch (error) {
-    log("[ContentScript] ⚠️ Netflix seek hatası:", error);
+    log("⚠️ Netflix seek hatası:", error);
   }
   
   return false;
@@ -586,11 +734,11 @@ async function handleVimeoSeek(targetTime) {
       if (iframe) {
         const player = new window.Vimeo.Player(iframe);
         await player.setCurrentTime(targetTime);
-        log("[ContentScript] ✅ Vimeo API seek başarılı");
+        log("✅ Vimeo API seek başarılı");
         return true;
       }
     } catch (error) {
-      log("[ContentScript] ⚠️ Vimeo API seek hatası:", error);
+      log("⚠️ Vimeo API seek hatası:", error);
     }
   }
   
@@ -603,7 +751,7 @@ async function tryDirectVideoSeek(video, targetTime) {
     const wasPlaying = !video.paused;
     const originalTime = video.currentTime;
     
-    log(`[ContentScript] 🎯 Doğrudan seek: ${originalTime}s → ${targetTime}s`);
+    log(`🎯 Doğrudan seek: ${originalTime.toFixed(2)}s → ${targetTime.toFixed(2)}s`);
     
     // Seeking event listener ekle
     let seekingResolved = false;
@@ -639,17 +787,17 @@ async function tryDirectVideoSeek(video, targetTime) {
       setTimeout(() => {
         if (video.paused) {
           video.play().catch(error => {
-            log("[ContentScript] ⚠️ Seek sonrası play hatası:", error);
+            log("⚠️ Seek sonrası play hatası:", error);
           });
         }
       }, 200);
     }
     
-    log(`[ContentScript] ${seekSuccess ? '✅' : '❌'} Doğrudan seek sonucu: ${video.currentTime}s`);
+    log(`${seekSuccess ? '✅' : '❌'} Doğrudan seek sonucu: ${video.currentTime.toFixed(2)}s`);
     return seekSuccess;
     
   } catch (error) {
-    log("[ContentScript] ❌ Doğrudan seek hatası:", error);
+    log("❌ Doğrudan seek hatası:", error);
     return false;
   }
 }
@@ -657,7 +805,7 @@ async function tryDirectVideoSeek(video, targetTime) {
 // ================== VIDEO OYNATMA ==================
 
 async function handlePlayVideo(sendResponse) {
-  log("[ContentScript] ▶️ Video oynatma işlemi başlatılıyor...");
+  log("▶️ Video oynatma işlemi başlatılıyor...");
   
   try {
     const activeVideo = findActiveVideo();
@@ -670,7 +818,7 @@ async function handlePlayVideo(sendResponse) {
       return;
     }
     
-    log(`[ContentScript] 📊 Mevcut durum:`, {
+    log(`📊 Mevcut durum:`, {
       paused: activeVideo.paused,
       currentTime: activeVideo.currentTime,
       readyState: activeVideo.readyState
@@ -678,7 +826,7 @@ async function handlePlayVideo(sendResponse) {
     
     // Eğer zaten oynatılıyorsa
     if (!activeVideo.paused) {
-      log("[ContentScript] ✅ Video zaten oynatılıyor");
+      log("✅ Video zaten oynatılıyor");
       sendResponse({
         success: true,
         message: "Video zaten oynatılıyor",
@@ -695,7 +843,7 @@ async function handlePlayVideo(sendResponse) {
     await sleep(CONTENT_CONFIG.STATE_CHECK_DELAY);
     const finalState = !activeVideo.paused;
     
-    log(`[ContentScript] 🎬 Play işlemi sonucu:`, {
+    log(`🎬 Play işlemi sonucu:`, {
       actionSuccess: success,
       finalPlaying: finalState,
       currentTime: activeVideo.currentTime
@@ -711,7 +859,7 @@ async function handlePlayVideo(sendResponse) {
     });
     
   } catch (error) {
-    log("[ContentScript] ❌ Video oynatma hatası:", error);
+    log("❌ Video oynatma hatası:", error);
     sendResponse({
       success: false,
       error: "PLAY_VIDEO_ERROR",
@@ -728,7 +876,7 @@ async function performPlayAction(video) {
     // Platform özel play dene
     const platformSuccess = await tryPlatformSpecificPlay(playerType);
     if (platformSuccess) {
-      log("[ContentScript] ✅ Platform özel play başarılı");
+      log("✅ Platform özel play başarılı");
       return true;
     }
     
@@ -736,7 +884,7 @@ async function performPlayAction(video) {
     return await tryDirectVideoPlay(video);
     
   } catch (error) {
-    log("[ContentScript] ❌ Play aksiyonu hatası:", error);
+    log("❌ Play aksiyonu hatası:", error);
     return false;
   }
 }
@@ -763,7 +911,7 @@ async function tryPlatformSpecificPlay(playerType) {
         return false;
     }
   } catch (error) {
-    log(`[ContentScript] ❌ Platform özel play hatası (${playerType}):`, error);
+    log(`❌ Platform özel play hatası (${playerType}):`, error);
     return false;
   }
 }
@@ -775,10 +923,10 @@ async function handleYouTubePlay() {
     try {
       window.ytplayer.playVideo();
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ YouTube API play başarılı");
+      log("✅ YouTube API play başarılı");
       return true;
     } catch (error) {
-      log("[ContentScript] ⚠️ YouTube API play hatası:", error);
+      log("⚠️ YouTube API play hatası:", error);
     }
   }
   
@@ -804,7 +952,7 @@ async function handleYouTubePlay() {
         
         button.click();
         await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-        log("[ContentScript] ✅ YouTube button play başarılı");
+        log("✅ YouTube button play başarılı");
         return true;
       }
     }
@@ -822,11 +970,11 @@ async function handleYouTubePlay() {
         cancelable: true
       }));
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ YouTube keyboard play başarılı");
+      log("✅ YouTube keyboard play başarılı");
       return true;
     }
   } catch (error) {
-    log("[ContentScript] ⚠️ YouTube keyboard play hatası:", error);
+    log("⚠️ YouTube keyboard play hatası:", error);
   }
   
   return false;
@@ -847,7 +995,7 @@ async function handleNetflixPlay() {
     if (button) {
       button.click();
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log(`[ContentScript] ✅ Netflix button play başarılı: ${selector}`);
+      log(`✅ Netflix button play başarılı: ${selector}`);
       return true;
     }
   }
@@ -863,11 +1011,11 @@ async function handleNetflixPlay() {
         cancelable: true
       }));
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ Netflix keyboard play başarılı");
+      log("✅ Netflix keyboard play başarılı");
       return true;
     }
   } catch (error) {
-    log("[ContentScript] ⚠️ Netflix keyboard play hatası:", error);
+    log("⚠️ Netflix keyboard play hatası:", error);
   }
   
   return false;
@@ -903,25 +1051,25 @@ async function handleHuluPlay() {
 async function tryDirectVideoPlay(video) {
   try {
     if (!video.paused) {
-      log("[ContentScript] ✅ Video zaten oynatılıyor");
+      log("✅ Video zaten oynatılıyor");
       return true;
     }
     
-    log("[ContentScript] 🎬 Doğrudan video.play() çağrılıyor");
+    log("🎬 Doğrudan video.play() çağrılıyor");
     
     // Play promise'i await et
     const playPromise = video.play();
     if (playPromise && typeof playPromise.then === 'function') {
       await playPromise;
-      log("[ContentScript] ✅ Doğrudan video.play() promise başarılı");
+      log("✅ Doğrudan video.play() promise başarılı");
     } else {
-      log("[ContentScript] ✅ Doğrudan video.play() başarılı (promise yok)");
+      log("✅ Doğrudan video.play() başarılı (promise yok)");
     }
     
     return true;
     
   } catch (error) {
-    log("[ContentScript] ❌ Doğrudan video.play() hatası:", error);
+    log("❌ Doğrudan video.play() hatası:", error);
     return false;
   }
 }
@@ -929,7 +1077,7 @@ async function tryDirectVideoPlay(video) {
 // ================== VIDEO DURAKLAMA ==================
 
 async function handlePauseVideo(sendResponse) {
-  log("[ContentScript] ⏸️ Video duraklama işlemi başlatılıyor...");
+  log("⏸️ Video duraklama işlemi başlatılıyor...");
   
   try {
     const activeVideo = findActiveVideo();
@@ -942,7 +1090,7 @@ async function handlePauseVideo(sendResponse) {
       return;
     }
     
-    log(`[ContentScript] 📊 Mevcut durum:`, {
+    log(`📊 Mevcut durum:`, {
       paused: activeVideo.paused,
       currentTime: activeVideo.currentTime,
       readyState: activeVideo.readyState
@@ -950,7 +1098,7 @@ async function handlePauseVideo(sendResponse) {
     
     // Eğer zaten duraklatılmışsa
     if (activeVideo.paused) {
-      log("[ContentScript] ✅ Video zaten duraklatılmış");
+      log("✅ Video zaten duraklatılmış");
       sendResponse({
         success: true,
         message: "Video zaten duraklatılmış",
@@ -967,7 +1115,7 @@ async function handlePauseVideo(sendResponse) {
     await sleep(CONTENT_CONFIG.STATE_CHECK_DELAY);
     const finalState = activeVideo.paused;
     
-    log(`[ContentScript] ⏸️ Pause işlemi sonucu:`, {
+    log(`⏸️ Pause işlemi sonucu:`, {
       actionSuccess: success,
       finalPaused: finalState,
       currentTime: activeVideo.currentTime
@@ -983,7 +1131,7 @@ async function handlePauseVideo(sendResponse) {
     });
     
   } catch (error) {
-    log("[ContentScript] ❌ Video duraklama hatası:", error);
+    log("❌ Video duraklama hatası:", error);
     sendResponse({
       success: false,
       error: "PAUSE_VIDEO_ERROR",
@@ -1000,7 +1148,7 @@ async function performPauseAction(video) {
     // Platform özel pause dene
     const platformSuccess = await tryPlatformSpecificPause(playerType);
     if (platformSuccess) {
-      log("[ContentScript] ✅ Platform özel pause başarılı");
+      log("✅ Platform özel pause başarılı");
       return true;
     }
     
@@ -1008,7 +1156,7 @@ async function performPauseAction(video) {
     return tryDirectVideoPause(video);
     
   } catch (error) {
-    log("[ContentScript] ❌ Pause aksiyonu hatası:", error);
+    log("❌ Pause aksiyonu hatası:", error);
     return false;
   }
 }
@@ -1035,7 +1183,7 @@ async function tryPlatformSpecificPause(playerType) {
         return false;
     }
   } catch (error) {
-    log(`[ContentScript] ❌ Platform özel pause hatası (${playerType}):`, error);
+    log(`❌ Platform özel pause hatası (${playerType}):`, error);
     return false;
   }
 }
@@ -1047,10 +1195,10 @@ async function handleYouTubePause() {
     try {
       window.ytplayer.pauseVideo();
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ YouTube API pause başarılı");
+      log("✅ YouTube API pause başarılı");
       return true;
     } catch (error) {
-      log("[ContentScript] ⚠️ YouTube API pause hatası:", error);
+      log("⚠️ YouTube API pause hatası:", error);
     }
   }
   
@@ -1075,7 +1223,7 @@ async function handleYouTubePause() {
         
         button.click();
         await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-        log("[ContentScript] ✅ YouTube button pause başarılı");
+        log("✅ YouTube button pause başarılı");
         return true;
       }
     }
@@ -1093,11 +1241,11 @@ async function handleYouTubePause() {
         cancelable: true
       }));
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ YouTube keyboard pause başarılı");
+      log("✅ YouTube keyboard pause başarılı");
       return true;
     }
   } catch (error) {
-    log("[ContentScript] ⚠️ YouTube keyboard pause hatası:", error);
+    log("⚠️ YouTube keyboard pause hatası:", error);
   }
   
   return false;
@@ -1118,7 +1266,7 @@ async function handleNetflixPause() {
     if (button) {
       button.click();
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log(`[ContentScript] ✅ Netflix button pause başarılı: ${selector}`);
+      log(`✅ Netflix button pause başarılı: ${selector}`);
       return true;
     }
   }
@@ -1134,11 +1282,11 @@ async function handleNetflixPause() {
         cancelable: true
       }));
       await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-      log("[ContentScript] ✅ Netflix keyboard pause başarılı");
+      log("✅ Netflix keyboard pause başarılı");
       return true;
     }
   } catch (error) {
-    log("[ContentScript] ⚠️ Netflix keyboard pause hatası:", error);
+    log("⚠️ Netflix keyboard pause hatası:", error);
   }
   
   // K tuşu denemesi (Netflix shortcut)
@@ -1150,10 +1298,10 @@ async function handleNetflixPause() {
       cancelable: true
     }));
     await sleep(CONTENT_CONFIG.PLATFORM_WAIT);
-    log("[ContentScript] ✅ Netflix K key pause başarılı");
+    log("✅ Netflix K key pause başarılı");
     return true;
   } catch (error) {
-    log("[ContentScript] ⚠️ Netflix K key pause hatası:", error);
+    log("⚠️ Netflix K key pause hatası:", error);
   }
   
   return false;
@@ -1189,18 +1337,18 @@ async function handleHuluPause() {
 function tryDirectVideoPause(video) {
   try {
     if (video.paused) {
-      log("[ContentScript] ✅ Video zaten duraklatılmış");
+      log("✅ Video zaten duraklatılmış");
       return true;
     }
     
-    log("[ContentScript] ⏸️ Doğrudan video.pause() çağrılıyor");
+    log("⏸️ Doğrudan video.pause() çağrılıyor");
     video.pause();
     
-    log("[ContentScript] ✅ Doğrudan video.pause() başarılı");
+    log("✅ Doğrudan video.pause() başarılı");
     return true;
     
   } catch (error) {
-    log("[ContentScript] ❌ Doğrudan video.pause() hatası:", error);
+    log("❌ Doğrudan video.pause() hatası:", error);
     return false;
   }
 }
@@ -1215,11 +1363,11 @@ async function trySelectorsClick(selectors, delay = CONTENT_CONFIG.PLATFORM_WAIT
       if (button) {
         button.click();
         await sleep(delay);
-        log(`[ContentScript] ✅ Selector click başarılı: ${selector}`);
+        log(`✅ Selector click başarılı: ${selector}`);
         return true;
       }
     } catch (error) {
-      log(`[ContentScript] ⚠️ Selector click hatası (${selector}):`, error);
+      log(`⚠️ Selector click hatası (${selector}):`, error);
     }
   }
   return false;
@@ -1234,7 +1382,7 @@ function sleep(ms) {
 
 // Content script başlatma
 function initializeContentScript() {
-  log("[ContentScript] 🚀 İçerik betiği başlatılıyor...");
+  log("🚀 İçerik betiği başlatılıyor...");
   
   // Script durumunu ayarla
   contentScriptState.isReady = true;
@@ -1250,18 +1398,18 @@ function initializeContentScript() {
   setTimeout(() => {
     const video = findActiveVideo();
     if (video) {
-      log("[ContentScript] ✅ Başlangıçta video bulundu:", {
+      log("✅ Başlangıçta video bulundu:", {
         currentTime: video.currentTime,
         duration: video.duration,
         paused: video.paused,
         playerType: detectPlayerType()
       });
     } else {
-      log("[ContentScript] ⚠️ Başlangıçta video bulunamadı");
+      log("⚠️ Başlangıçta video bulunamadı");
     }
   }, 2000);
   
-  log("[ContentScript] ✅ İçerik betiği hazır");
+  log("✅ İçerik betiği hazır");
 }
 
 // URL değişikliklerini izle (SPA'lar için)
@@ -1271,7 +1419,7 @@ function setupUrlObserver() {
   contentScriptState.urlObserver = new MutationObserver(() => {
     if (window.location.href !== currentUrl) {
       currentUrl = window.location.href;
-      log("[ContentScript] 🔄 URL değişti:", currentUrl);
+      log("🔄 URL değişti:", currentUrl);
       
       // Video önbelleğini temizle
       contentScriptState.currentVideo = null;
@@ -1280,7 +1428,7 @@ function setupUrlObserver() {
       setTimeout(() => {
         const video = findActiveVideo();
         if (video) {
-          log("[ContentScript] ✅ URL değişikliği sonrası video bulundu");
+          log("✅ URL değişikliği sonrası video bulundu");
         }
       }, 1500);
     }
@@ -1317,7 +1465,7 @@ function setupVideoObserver() {
 
 // Cleanup fonksiyonu
 function cleanup() {
-  log("[ContentScript] 🧹 Temizlik yapılıyor...");
+  log("🧹 Temizlik yapılıyor...");
   
   if (contentScriptState.urlObserver) {
     contentScriptState.urlObserver.disconnect();
@@ -1345,4 +1493,4 @@ if (document.readyState === 'loading') {
   initializeContentScript();
 }
 
-log("[ContentScript] 🎬 Gelişmiş video kontrol sistemi yüklendi ve hazır!");
+log("🎬 Tamamen tamir edilmiş video kontrol sistemi yüklendi ve hazır!");
