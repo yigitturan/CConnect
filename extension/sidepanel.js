@@ -1570,6 +1570,9 @@ document.addEventListener("DOMContentLoaded", () => {
     webrtcSystem.remoteStream = new MediaStream();
     if (elements.remoteVideo) {
       elements.remoteVideo.srcObject = webrtcSystem.remoteStream;
+      
+      elements.remoteVideo.style.transform = "scaleX(-1)";
+
     }
     
     webrtcSystem.peerConnection.ontrack = (event) => {
