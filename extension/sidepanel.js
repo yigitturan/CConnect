@@ -1939,6 +1939,8 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("  - window.videoSyncApp.cleanup()");
   console.log("  - window.videoSyncApp.resetSync()");
   
+  // ================== MEVCUT KOD SONU (sidepanel.js'nin son satırları) ==================
+
   // Final ready message with performance info
   setTimeout(() => {
     const debugInfo = getSyncDebugInfo();
@@ -1956,3 +1958,552 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 3000);
   
 });
+
+// ================== BURADAN YENİ KOD BAŞLIYOR ==================
+// ================== GELİŞTİRİLMİŞ VIDEO SYNC SİSTEMİ - KOPUKLUK FİXLERİ ==================
+
+console.log("🔧 Loading Enhanced Video Sync System...");
+
+// Mevcut video sync nesnesine eklenecek iyileştirmeler
+let enhancedVideoSync = {
+  // YENİ: Daha detaylı state tracking
+  lastMasterState: null,
+  lastMyState: null,
+  stateHistory: [],
+  maxHistorySize: 10,
+  
+  // YENİ: Geliştirilmiş timing ayarları
+  masterBroadcastInterval: 1000,    // Master 1 saniyede bir broadcast (daha stabil)
+  followerReportInterval: 2000,     // Follower 2 saniyede bir rapor
+  stateValidityDuration: 8000,      // State 8 saniye geçerli
+  
+  // YENİ: Adaptif sync parametreleri
+  adaptiveSync: {
+    enabled: true,
+    minSyncThreshold: 1.5,          // Minimum sync eşiği
+    maxSyncThreshold: 3.0,          // Maksimum sync eşiği
+    urgentSyncThreshold: 6.0,       // Acil sync eşiği
+    adaptiveCooldown: 2000,         // Adaptif cooldown
+    maxCooldown: 5000,              // Maksimum cooldown
+    successiveFailures: 0,          // Ardışık başarısızlık sayısı
+    lastSuccessTime: 0              // Son başarılı sync zamanı
+  },
+  
+  // YENİ: Network durumu izleme
+  networkStatus: {
+    latency: 0,
+    lastPingTime: 0,
+    connectionQuality: 'good',      // good, medium, poor
+    retryCount: 0
+  },
+  
+  // YENİ: Geliştirilmiş hata yönetimi
+  errorTracking: {
+    consecutiveErrors: 0,
+    lastErrorTime: 0,
+    errorTypes: {},
+    maxConsecutiveErrors: 5
+  }
+};
+
+// ================== 1. GELİŞTİRİLMİŞ STATE VALİDATION ==================
+
+function validateVideoState(state, source = 'unknown') {
+  if (!state) {
+    console.warn(`⚠️ Null state from ${source}`);
+    return { valid: false, reason: 'null_state' };
+  }
+  
+  // Temel validasyon
+  if (typeof state.currentTime !== 'number' || isNaN(state.currentTime)) {
+    console.warn(`⚠️ Invalid currentTime from ${source}:`, state.currentTime);
+    return { valid: false, reason: 'invalid_time' };
+  }
+  
+  if (state.currentTime < 0) {
+    console.warn(`⚠️ Negative time from ${source}:`, state.currentTime);
+    return { valid: false, reason: 'negative_time' };
+  }
+  
+  if (typeof state.paused !== 'boolean') {
+    console.warn(`⚠️ Invalid paused state from ${source}:`, state.paused);
+    return { valid: false, reason: 'invalid_paused' };
+  }
+  
+  // Timestamp validasyon
+  if (!state.timestamp || typeof state.timestamp !== 'number') {
+    console.warn(`⚠️ Invalid timestamp from ${source}:`, state.timestamp);
+    return { valid: false, reason: 'invalid_timestamp' };
+  }
+  
+  // State yaşı kontrolü
+  const stateAge = Date.now() - state.timestamp;
+  if (stateAge > enhancedVideoSync.stateValidityDuration) {
+    console.warn(`⚠️ Stale state from ${source}, age: ${stateAge}ms`);
+    return { valid: false, reason: 'stale_state', age: stateAge };
+  }
+  
+  return { valid: true };
+}
+
+// ================== 2. ADAPTIF SYNC THRESHOLD SİSTEMİ ==================
+
+function calculateAdaptiveSyncThreshold() {
+  const adaptive = enhancedVideoSync.adaptiveSync;
+  
+  if (!adaptive.enabled) {
+    return videoSync.maxSyncDifference || 2.0;
+  }
+  
+  // Network kalitesine göre threshold ayarla
+  let threshold = adaptive.minSyncThreshold;
+  
+  switch (enhancedVideoSync.networkStatus.connectionQuality) {
+    case 'poor':
+      threshold = adaptive.maxSyncThreshold;
+      break;
+    case 'medium':
+      threshold = (adaptive.minSyncThreshold + adaptive.maxSyncThreshold) / 2;
+      break;
+    case 'good':
+    default:
+      threshold = adaptive.minSyncThreshold;
+      break;
+  }
+  
+  // Ardışık başarısızlıklara göre threshold artır
+  if (adaptive.successiveFailures > 2) {
+    threshold += (adaptive.successiveFailures - 2) * 0.5;
+    threshold = Math.min(threshold, adaptive.maxSyncThreshold);
+  }
+  
+  console.log(`🎯 Adaptive threshold: ${threshold.toFixed(1)}s (quality: ${enhancedVideoSync.networkStatus.connectionQuality}, failures: ${adaptive.successiveFailures})`);
+  return threshold;
+}
+
+function calculateAdaptiveCooldown() {
+  const adaptive = enhancedVideoSync.adaptiveSync;
+  
+  if (!adaptive.enabled) {
+    return videoSync.syncCooldown || 3000;
+  }
+  
+  // Başarısızlık sayısına göre cooldown artır
+  let cooldown = adaptive.adaptiveCooldown;
+  
+  if (adaptive.successiveFailures > 0) {
+    cooldown += adaptive.successiveFailures * 1000; // Her başarısızlık için +1s
+    cooldown = Math.min(cooldown, adaptive.maxCooldown);
+  }
+  
+  return cooldown;
+}
+
+// ================== 3. NETWORK KALİTESİ İZLEME ==================
+
+async function updateNetworkStatus() {
+  const startTime = Date.now();
+  
+  try {
+    // Firebase ping testi
+    if (appState.database) {
+      const testRef = appState.database.ref('.info/connected');
+      const snapshot = await testRef.once('value');
+      
+      const latency = Date.now() - startTime;
+      enhancedVideoSync.networkStatus.latency = latency;
+      enhancedVideoSync.networkStatus.lastPingTime = Date.now();
+      
+      // Bağlantı kalitesini belirle
+      if (latency < 200) {
+        enhancedVideoSync.networkStatus.connectionQuality = 'good';
+      } else if (latency < 500) {
+        enhancedVideoSync.networkStatus.connectionQuality = 'medium';
+      } else {
+        enhancedVideoSync.networkStatus.connectionQuality = 'poor';
+      }
+      
+      console.log(`📡 Network status: ${enhancedVideoSync.networkStatus.connectionQuality} (${latency}ms)`);
+    }
+    
+  } catch (error) {
+    console.error("Network status check failed:", error);
+    enhancedVideoSync.networkStatus.connectionQuality = 'poor';
+    enhancedVideoSync.networkStatus.retryCount++;
+  }
+}
+
+// ================== 4. GELİŞTİRİLMİŞ MASTER BROADCAST ==================
+
+async function enhancedMasterBroadcast() {
+  if (!videoSync.active || !masterSystem.iAmMaster) return;
+  
+  try {
+    const videoState = await getVideoState();
+    
+    if (!videoState.success) {
+      console.warn("⚠️ Master: Video state alınamadı");
+      enhancedVideoSync.errorTracking.consecutiveErrors++;
+      return;
+    }
+    
+    // State validasyonu
+    const validation = validateVideoState(videoState, 'master_local');
+    if (!validation.valid) {
+      console.warn("⚠️ Master: Invalid local state:", validation.reason);
+      enhancedVideoSync.errorTracking.consecutiveErrors++;
+      return;
+    }
+    
+    const masterData = {
+      currentTime: Number(videoState.currentTime.toFixed(3)),
+      paused: Boolean(videoState.paused),
+      url: videoState.videoUrl || window.location.href,
+      timestamp: Date.now(),
+      isMaster: true,
+      nickname: appState.currentUser,
+      playbackRate: videoState.playbackRate || 1,
+      duration: videoState.duration || 0,
+      
+      // YENİ: Ek metadata
+      networkQuality: enhancedVideoSync.networkStatus.connectionQuality,
+      sequenceNumber: Date.now(),
+      broadcastLatency: enhancedVideoSync.networkStatus.latency
+    };
+    
+    // Firebase'e gönder
+    await videoSync.myRef.set(masterData);
+    
+    enhancedVideoSync.lastMasterState = masterData;
+    enhancedVideoSync.errorTracking.consecutiveErrors = 0;
+    
+    // UI güncelle
+    updateVideoTimes(masterData.currentTime, 0);
+    
+    console.log("📤 Enhanced master broadcast:", {
+      time: masterData.currentTime.toFixed(2),
+      paused: masterData.paused,
+      networkQuality: masterData.networkQuality
+    });
+    
+  } catch (error) {
+    console.error("Enhanced master broadcast error:", error);
+    enhancedVideoSync.errorTracking.consecutiveErrors++;
+  }
+}
+
+// ================== 5. GELİŞTİRİLMİŞ FOLLOWER SYNC ==================
+
+async function enhancedFollowerSync(masterState, myState) {
+  const now = Date.now();
+  
+  try {
+    // Validasyon
+    const masterValidation = validateVideoState(masterState, 'master_remote');
+    const myValidation = validateVideoState(myState, 'follower_local');
+    
+    if (!masterValidation.valid || !myValidation.valid) {
+      console.warn("⚠️ Invalid states for sync:", {
+        master: masterValidation.reason,
+        my: myValidation.reason
+      });
+      return false;
+    }
+    
+    // Adaptif threshold ve cooldown
+    const adaptiveThreshold = calculateAdaptiveSyncThreshold();
+    const adaptiveCooldown = calculateAdaptiveCooldown();
+    
+    // Cooldown kontrolü
+    if (now - (videoSync.lastSyncTime || 0) < adaptiveCooldown) {
+      return false;
+    }
+    
+    // Sync gereksinimini analiz et
+    const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
+    const pauseStateDiff = myState.paused !== masterState.paused;
+    
+    // Küçük farklar için sync yapma
+    if (timeDiff < adaptiveThreshold && !pauseStateDiff) {
+      enhancedVideoSync.adaptiveSync.lastSuccessTime = now;
+      enhancedVideoSync.adaptiveSync.successiveFailures = Math.max(0, enhancedVideoSync.adaptiveSync.successiveFailures - 1);
+      updateSyncStatus(`✅ Enhanced sync - ${timeDiff.toFixed(1)}s diff`);
+      return true;
+    }
+    
+    console.log("🔄 Enhanced follower sync:", {
+      masterTime: masterState.currentTime.toFixed(3),
+      myTime: myState.currentTime.toFixed(3),
+      timeDiff: timeDiff.toFixed(3),
+      pauseStateDiff,
+      adaptiveThreshold: adaptiveThreshold.toFixed(1)
+    });
+    
+    // Sync işlemi
+    videoSync.syncing = true;
+    videoSync.lastSyncTime = now;
+    
+    updateSyncStatus("🔄 Enhanced synchronizing...");
+    
+    let syncSuccess = false;
+    
+    // 1. Play/Pause sync
+    if (pauseStateDiff) {
+      if (masterState.paused && !myState.paused) {
+        await executeVideoAction('pauseVideo');
+      } else if (!masterState.paused && myState.paused) {
+        await executeVideoAction('playVideo');
+      }
+      await sleep(200);
+    }
+    
+    // 2. Time sync
+    if (timeDiff > adaptiveThreshold) {
+      let targetTime = masterState.currentTime;
+      
+      // Network gecikmesi kompansasyonu
+      if (enhancedVideoSync.networkStatus.latency > 100) {
+        const compensationFactor = enhancedVideoSync.networkStatus.latency / 1000;
+        if (!masterState.paused) {
+          targetTime += compensationFactor;
+        }
+      }
+      
+      const timeSuccess = await executeVideoAction('setVideoTime', targetTime);
+      syncSuccess = timeSuccess;
+    } else {
+      syncSuccess = true;
+    }
+    
+    // Sonuç
+    if (syncSuccess) {
+      enhancedVideoSync.adaptiveSync.lastSuccessTime = now;
+      enhancedVideoSync.adaptiveSync.successiveFailures = Math.max(0, enhancedVideoSync.adaptiveSync.successiveFailures - 1);
+      updateSyncStatus(`✅ Enhanced sync successful`);
+    } else {
+      enhancedVideoSync.adaptiveSync.successiveFailures++;
+      updateSyncStatus(`❌ Enhanced sync failed`);
+    }
+    
+    return syncSuccess;
+    
+  } catch (error) {
+    console.error("Enhanced follower sync error:", error);
+    enhancedVideoSync.adaptiveSync.successiveFailures++;
+    return false;
+  } finally {
+    setTimeout(() => {
+      videoSync.syncing = false;
+    }, 1000);
+  }
+}
+
+// ================== 6. ENHANCED TIMER SİSTEMİ ==================
+
+function startEnhancedTimers() {
+  // Mevcut timer'ları temizle
+  if (videoSync.updateTimer) {
+    clearInterval(videoSync.updateTimer);
+    videoSync.updateTimer = null;
+  }
+  
+  if (videoSync.followerTimer) {
+    clearInterval(videoSync.followerTimer);
+    videoSync.followerTimer = null;
+  }
+  
+  if (masterSystem.iAmMaster) {
+    // Enhanced Master Timer
+    videoSync.updateTimer = setInterval(enhancedMasterBroadcast, enhancedVideoSync.masterBroadcastInterval);
+  } else {
+    // Enhanced Follower Timer  
+    videoSync.followerTimer = setInterval(async () => {
+      if (!videoSync.active || masterSystem.iAmMaster) return;
+      
+      try {
+        const videoState = await getVideoState();
+        if (videoState.success) {
+          const followerData = {
+            currentTime: Number(videoState.currentTime.toFixed(3)),
+            paused: Boolean(videoState.paused),
+            url: videoState.videoUrl || window.location.href,
+            timestamp: Date.now(),
+            isMaster: false,
+            nickname: appState.currentUser,
+            playbackRate: videoState.playbackRate || 1,
+            duration: videoState.duration || 0,
+            networkQuality: enhancedVideoSync.networkStatus.connectionQuality,
+            syncStatus: videoSync.syncing ? 'syncing' : 'ready'
+          };
+          
+          await videoSync.myRef.set(followerData);
+        }
+      } catch (error) {
+        console.error("Enhanced follower report error:", error);
+      }
+    }, enhancedVideoSync.followerReportInterval);
+  }
+  
+  console.log(`🔄 Enhanced timers started - Role: ${masterSystem.iAmMaster ? 'Master 👑' : 'Follower 👤'}`);
+}
+
+// ================== 7. ENHANCED STATE CHANGE HANDLER ==================
+
+function enhancedHandleVideoStateChange(snapshot) {
+  if (!snapshot.exists()) return;
+  
+  try {
+    const states = snapshot.val();
+    
+    if (masterSystem.iAmMaster) {
+      // Master: Kendi durumunu göster
+      const myState = states[appState.currentUser];
+      if (myState && validateVideoState(myState, 'master_self').valid) {
+        updateVideoTimes(myState.currentTime, 0);
+      }
+      return;
+    }
+    
+    // Follower: Enhanced sync
+    const masterState = findMasterState(states);
+    const myState = states[appState.currentUser];
+    
+    if (!masterState || !myState) {
+      updateVideoTimes(myState?.currentTime || 0, masterState?.currentTime || 0);
+      return;
+    }
+    
+    // UI güncelle
+    updateVideoTimes(myState.currentTime, masterState.currentTime);
+    
+    // Enhanced sync
+    enhancedFollowerSync(masterState, myState);
+    
+  } catch (error) {
+    console.error("Enhanced state change error:", error);
+  }
+}
+
+// ================== 8. SİSTEM DİAGNOSTİCS ==================
+
+function getEnhancedDiagnostics() {
+  return {
+    timestamp: Date.now(),
+    version: 'enhanced-v5.1',
+    
+    networkStatus: enhancedVideoSync.networkStatus,
+    adaptiveSync: enhancedVideoSync.adaptiveSync,
+    errorTracking: enhancedVideoSync.errorTracking,
+    
+    lastMasterState: enhancedVideoSync.lastMasterState ? {
+      time: enhancedVideoSync.lastMasterState.currentTime,
+      paused: enhancedVideoSync.lastMasterState.paused,
+      age: Date.now() - enhancedVideoSync.lastMasterState.timestamp
+    } : null,
+    
+    syncStatus: {
+      syncing: videoSync.syncing,
+      lastSyncTime: videoSync.lastSyncTime,
+      adaptiveThreshold: calculateAdaptiveSyncThreshold(),
+      adaptiveCooldown: calculateAdaptiveCooldown()
+    }
+  };
+}
+
+// ================== 9. EMERGENCY RECOVERY ==================
+
+function emergencyRecovery() {
+  console.log("🚨 Enhanced emergency recovery...");
+  
+  // State'leri sıfırla
+  videoSync.syncing = false;
+  videoSync.lastSyncTime = 0;
+  
+  // Enhanced tracking sıfırla
+  enhancedVideoSync.errorTracking.consecutiveErrors = 0;
+  enhancedVideoSync.adaptiveSync.successiveFailures = 0;
+  enhancedVideoSync.adaptiveSync.lastSuccessTime = Date.now();
+  
+  // Network durumunu güncelle
+  updateNetworkStatus();
+  
+  // Timer'ları yeniden başlat
+  startEnhancedTimers();
+  
+  updateSyncStatus("🔄 Enhanced recovery completed");
+  console.log("✅ Enhanced emergency recovery completed");
+}
+
+// ================== 10. İNİTİALİZATION ==================
+
+function initializeEnhancedVideoSync() {
+  console.log("🚀 Initializing Enhanced Video Sync System...");
+  
+  // Network monitoring başlat
+  setTimeout(updateNetworkStatus, 2000);
+  setInterval(updateNetworkStatus, 15000);
+  
+  // Orijinal fonksiyonları sakla
+  if (typeof startRoleBasedTimers !== 'undefined') {
+    window.originalStartRoleBasedTimers = startRoleBasedTimers;
+  }
+  if (typeof handleVideoStateChange !== 'undefined') {
+    window.originalHandleVideoStateChange = handleVideoStateChange;
+  }
+  
+  // Enhanced fonksiyonları global yap
+  window.startRoleBasedTimers = startEnhancedTimers;
+  window.handleVideoStateChange = enhancedHandleVideoStateChange;
+  
+  // Global API'yi genişlet
+  if (window.videoSyncApp) {
+    window.videoSyncApp.enhanced = {
+      diagnostics: getEnhancedDiagnostics,
+      emergencyRecovery: emergencyRecovery,
+      updateNetworkStatus: updateNetworkStatus,
+      
+      setAdaptiveSync: (enabled) => {
+        enhancedVideoSync.adaptiveSync.enabled = enabled;
+        console.log(`Enhanced adaptive sync: ${enabled ? 'enabled' : 'disabled'}`);
+      },
+      
+      resetSettings: () => {
+        enhancedVideoSync.adaptiveSync.successiveFailures = 0;
+        enhancedVideoSync.errorTracking.consecutiveErrors = 0;
+        console.log("Enhanced settings reset");
+      }
+    };
+  }
+  
+  console.log("✅ Enhanced Video Sync System initialized");
+  console.log("🔧 Enhanced features active:");
+  console.log("  ✅ Adaptive sync thresholds");
+  console.log("  ✅ Network quality monitoring");
+  console.log("  ✅ Enhanced error recovery");
+  console.log("  ✅ State validation system");
+}
+
+// ================== AUTO-START ==================
+
+// Enhanced sistem otomatik başlatma
+if (typeof window !== 'undefined') {
+  // App hazır olduğunda enhanced sistemi başlat
+  const startEnhanced = () => {
+    if (window.videoSyncApp && window.videoSyncApp.appState && window.videoSyncApp.appState.initialized) {
+      initializeEnhancedVideoSync();
+      
+      console.log("🎯 ENHANCED VIDEO SYNC SYSTEM READY!");
+      console.log("📊 Diagnostics: window.videoSyncApp.enhanced.diagnostics()");
+      console.log("🚨 Emergency: window.videoSyncApp.enhanced.emergencyRecovery()");
+      
+    } else {
+      // Henüz hazır değilse 2 saniye sonra tekrar dene
+      setTimeout(startEnhanced, 2000);
+    }
+  };
+  
+  // 3 saniye sonra başlat (ana app'in initialize olması için)
+  setTimeout(startEnhanced, 3000);
+}
+
+console.log("🔧 Enhanced Video Sync System loaded and waiting for app initialization...");
