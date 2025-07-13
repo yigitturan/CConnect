@@ -1,7 +1,8 @@
-// ================== TAMAMEN TAMİR EDİLMİŞ SIDEPANEL - VIDEO SYNC & CHAT ==================
+// ================== TAMAMEN DÜZELTİLMİŞ SIDEPANEL - VIDEO SYNC & CHAT ==================
+// Tüm sorunlar çözülmüş, temiz ve optimize edilmiş versiyon
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 Tamamen Tamir Edilmiş Video Sync App v5 başlatılıyor...");
+  console.log("🚀 Düzeltilmiş Video Sync App v6 başlatılıyor...");
   
   // ================== GLOBAL STATE ==================
   
@@ -13,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initialized: false
   };
   
-  // Master-Follower system
+  // Master-Follower system - düzeltilmiş
   let masterSystem = {
     active: false,
     currentMaster: "",
@@ -24,22 +25,22 @@ document.addEventListener("DOMContentLoaded", () => {
     heartbeatTimer: null
   };
   
-  // Video sync system - TAMİR EDİLMİŞ
+  // Video sync system - tamamen düzeltilmiş
   let videoSync = {
     active: false,
     roomRef: null,
     myRef: null,
     listener: null,
-    updateTimer: null,
-    followerTimer: null,
+    activeTimer: null,          // Tek timer sistemi
     lastState: null,
     syncing: false,
     lastSyncTime: 0,           
-    syncCooldown: 3000,        // 3 saniye cooldown (daha kısa)
-    maxSyncDifference: 2.0,    // 2 saniye farkta sync yap
+    syncCooldown: 5000,         // 5 saniye cooldown (daha uzun)
+    maxSyncDifference: 3.0,     // 3 saniye farkta sync yap
     consecutiveSyncs: 0,       
-    maxConsecutiveSyncs: 3,    // Max 3 consecutive sync
-    urgentSyncThreshold: 5.0   // 5+ saniye fark için acil sync
+    maxConsecutiveSyncs: 3,     
+    urgentSyncThreshold: 6.0,   // 6+ saniye fark için acil sync
+    role: null                  // 'master' veya 'follower'
   };
   
   // Chat system
@@ -172,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
       
       if (appState.database) {
         appState.database.goOnline();
-        console.log("✅ Firebase initialized (CSP compliant)");
+        console.log("✅ Firebase initialized");
         return true;
       }
       
@@ -537,7 +538,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  // ================== TAMİR EDİLMİŞ UPDATE MASTER UI ==================
+  // ================== TAMAMEN DÜZELTİLMİŞ UPDATE MASTER UI ==================
   
   function updateMasterUI() {
     if (elements.masterStatus) {
@@ -557,13 +558,34 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }
     
-    // *** CRİTİCAL FIX: ROLE DEĞİŞİMİNDE TIMER'LARI YENİDEN BAŞLAT ***
+    // *** TAMAMEN DÜZELTİLMİŞ ROLE DEĞİŞİM SİSTEMİ ***
     if (videoSync.active) {
-      console.log("🔄 Role changed, restarting sync timers...");
-      restartVideoSyncTimers();
+      console.log("🔄 Role changed, performing COMPLETE cleanup and restart...");
+      
+      // EKLE: Önce role'ü set et
+      // EKLE: Önce role'ü set et
+      const newRole = masterSystem.iAmMaster ? 'master' : 'follower';
+      videoSync.role = newRole; 
+
+      // 1. TEK TİMER SİSTEMİ - TÜM TİMER'LARI TEMİZLE
+      stopVideoSyncTimer();
+      
+      // 2. STATE'LERİ SIFIRLA
+      videoSync.syncing = false;
+      videoSync.lastSyncTime = 0;
+      videoSync.consecutiveSyncs = 0;
+      videoSync.role = masterSystem.iAmMaster ? 'master' : 'follower';
+      
+      // 3. UZUN BEKLEME VE TEMİZ BAŞLATMA
+      setTimeout(() => {
+        if (videoSync.active) {
+          startVideoSyncTimer();
+          console.log("✅ Clean timer restarted for role:", videoSync.role);
+        }
+      }, 3000); // 3 saniye bekleme (daha uzun)
     }
     
-    // *** UI SYNC STATUS'UNU GÜNCELLE ***
+    // UI sync status güncelle
     if (masterSystem.iAmMaster) {
       updateSyncStatus("👑 Master - Broadcasting state");
     } else {
@@ -599,17 +621,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  // ================== TAMİR EDİLMİŞ VIDEO SYNC SYSTEM ==================
+  // ================== TAMAMEN DÜZELTİLMİŞ VIDEO SYNC SYSTEM ==================
   
   async function startVideoSync(roomId) {
-    console.log("🎬 Starting Enhanced Video Sync...");
+    console.log("🎬 Starting FIXED Video Sync...");
     
     try {
       videoSync.active = true;
       videoSync.roomRef = appState.database.ref(`videoSync/${roomId}/states`);
       videoSync.myRef = videoSync.roomRef.child(appState.currentUser);
+      videoSync.role = masterSystem.iAmMaster ? 'master' : 'follower';
       
-      // *** TAMİR EDİLMİŞ STATE RESET ***
+      // *** TAMAMEN DÜZELTİLMİŞ STATE RESET ***
       videoSync.syncing = false;
       videoSync.lastSyncTime = 0;
       videoSync.consecutiveSyncs = 0;
@@ -620,11 +643,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       videoSync.listener = videoSync.roomRef.on('value', handleVideoStateChange);
       
-      // *** ROLE BASED TIMER START ***
-      startRoleBasedTimers();
+      // *** TEK TİMER SİSTEMİ BAŞLAT ***
+      startVideoSyncTimer();
       
       updateSyncStatus("🎬 Video sync active");
-      console.log("✅ Enhanced Video sync started");
+      console.log("✅ FIXED Video sync started with role:", videoSync.role);
       
     } catch (error) {
       console.error("❌ Video sync startup error:", error);
@@ -632,24 +655,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   
-  // ================== TAMİR EDİLMİŞ ROLE BASED TIMERS ==================
+  // ================== TEK TİMER SİSTEMİ - TAMAMEN DÜZELTİLMİŞ ==================
   
-  function startRoleBasedTimers() {
-    // Mevcut timer'ları temizle
-    if (videoSync.updateTimer) {
-      clearInterval(videoSync.updateTimer);
-      videoSync.updateTimer = null;
-    }
+  function startVideoSyncTimer() {
+    // Önce mevcut timer'ı temizle
+    stopVideoSyncTimer();
     
-    if (videoSync.followerTimer) {
-      clearInterval(videoSync.followerTimer);
-      videoSync.followerTimer = null;
-    }
+    if (!videoSync.active) return;
     
-    if (masterSystem.iAmMaster) {
-      // *** MASTER: DAHA SIK VE DOĞRU STATE PAYLAŞ ***
-      videoSync.updateTimer = setInterval(async () => {
-        if (!videoSync.active || !masterSystem.iAmMaster) return;
+    const role = masterSystem.iAmMaster ? 'master' : 'follower';
+    videoSync.role = role;
+    
+    if (role === 'master') {
+      // *** MASTER: 2 saniyede bir broadcast ***
+      videoSync.activeTimer = setInterval(async () => {
+        if (!videoSync.active || !masterSystem.iAmMaster) {
+          stopVideoSyncTimer();
+          return;
+        }
         
         try {
           const videoState = await getVideoState();
@@ -665,28 +688,29 @@ document.addEventListener("DOMContentLoaded", () => {
               duration: videoState.duration || 0
             };
             
-            // Her zaman Firebase'e gönder (master için)
             await videoSync.myRef.set(masterData);
             videoSync.lastState = masterData;
             
-            // *** UI'Yİ GÜNCELLE - KENDİ SÜREMİ GÖSTER ***
+            // UI güncelle - sadece kendi süreyi göster
             updateVideoTimes(masterData.currentTime, 0);
             
             console.log("📤 Master broadcast:", {
               time: masterData.currentTime.toFixed(1),
-              paused: masterData.paused,
-              timestamp: new Date(masterData.timestamp).toLocaleTimeString()
+              paused: masterData.paused
             });
           }
         } catch (error) {
           console.error("Master broadcast error:", error);
         }
-      }, 1500); // Master 1.5 saniyede bir broadcast (daha sık)
+      }, 2000); // Master 2 saniyede bir
       
     } else {
-      // *** FOLLOWER: KENDI DURUMUNU RAPOR ET ***
-      videoSync.followerTimer = setInterval(async () => {
-        if (!videoSync.active || masterSystem.iAmMaster) return;
+      // *** FOLLOWER: 3 saniyede bir rapor ***
+      videoSync.activeTimer = setInterval(async () => {
+        if (!videoSync.active || masterSystem.iAmMaster) {
+          stopVideoSyncTimer();
+          return;
+        }
         
         try {
           const videoState = await getVideoState();
@@ -703,1807 +727,1324 @@ document.addEventListener("DOMContentLoaded", () => {
             };
             
             await videoSync.myRef.set(followerData);
-            
-            // Follower için log (daha az gürültü)
-            if (Math.random() < 0.3) { // %30 şansla log
-              console.log("📊 Follower report:", {
-                time: followerData.currentTime.toFixed(1),
-                paused: followerData.paused
-              });
-            }
           }
         } catch (error) {
           console.error("Follower report error:", error);
         }
-      }, 3000); // Follower 3 saniyede bir rapor
+      }, 3000); // Follower 3 saniyede bir
     }
     
-    console.log(`🔄 Enhanced timers started - Role: ${masterSystem.iAmMaster ? 'Master 👑' : 'Follower 👤'}`);
+    console.log(`🔄 Clean timer started - Role: ${role} (Timer ID: ${videoSync.activeTimer})`);
   }
   
-  // ================== TAMİR EDİLMİŞ RESTART TIMERS ==================
-  
-  function restartVideoSyncTimers() {
-    console.log("🔄 Restarting video sync timers due to role change...");
-    
-    // Önceki timer'ları temizle
-    if (videoSync.updateTimer) {
-      clearInterval(videoSync.updateTimer);
-      videoSync.updateTimer = null;
-    }
-    
-    if (videoSync.followerTimer) {
-      clearInterval(videoSync.followerTimer);
-      videoSync.followerTimer = null;
-    }
-    
-    // Sync state'ini sıfırla
-    videoSync.syncing = false;
-    videoSync.lastSyncTime = 0;
-    videoSync.consecutiveSyncs = 0;
-    
-    // Yeni role'e göre timer'ları başlat
-    startRoleBasedTimers();
-    
-    console.log(`✅ Timers restarted for role: ${masterSystem.iAmMaster ? 'Master' : 'Follower'}`);
-  }
-  
-  // ================== TAMİR EDİLMİŞ MASTER STATE BULMA ==================
-  
-  function findMasterState(states) {
-    // Master kullanıcıyı önce bul
-    const masterUser = masterSystem.currentMaster;
-    
-    if (!masterUser) {
-      console.log("⚠️ No current master set");
-      return null;
-    }
-    
-    // Master'ın state'ini bul
-    const masterState = states[masterUser];
-    
-    if (!masterState) {
-      console.log(`⚠️ Master ${masterUser} state not found in Firebase`);
-      return null;
-    }
-    
-    // Master state'in geçerli olduğunu kontrol et
-    if (!masterState.isMaster) {
-      console.log(`⚠️ User ${masterUser} is marked as master but state shows isMaster=false`);
-      // Yine de master state olarak kullan
-    }
-    
-    console.log(`👑 Master state found: ${masterUser} at ${masterState.currentTime.toFixed(1)}s`);
-    return masterState;
-  }
-  
-  // ================== TAMİR EDİLMİŞ VIDEO STATE CHANGE HANDLER ==================
-  
-  function handleVideoStateChange(snapshot) {
-    if (!snapshot.exists()) return;
-    
-    try {
-      const states = snapshot.val();
-      
-      if (masterSystem.iAmMaster) {
-        // *** MASTER: KENDİ STATE'İNİ GÖSTER VE DİĞER FOLLOWER'LARI KONTROL ET ***
-        const myState = states[appState.currentUser];
-        
-        if (myState) {
-          updateVideoTimes(myState.currentTime, 0);
-        }
-        
-        // Diğer follower'ların durumunu kontrol et (opsiyonel loglama için)
-        Object.entries(states).forEach(([user, state]) => {
-          if (user !== appState.currentUser && !state.isMaster) {
-            console.log(`👤 Follower ${user}: ${state.currentTime.toFixed(1)}s, paused: ${state.paused}`);
-          }
-        });
-        
-        return; // Master hiçbir zaman sync yapmaz!
-      }
-      
-      // *** FOLLOWER: MASTER'A SYNC YAP ***
-      
-      // Master state'ini bul
-      const masterState = findMasterState(states);
-      const myState = states[appState.currentUser];
-      
-      if (!masterState) {
-        console.log("⚠️ Master state not found");
-        updateVideoTimes(myState?.currentTime || 0, 0); // Master süresi 0 göster
-        return;
-      }
-      
-      if (!myState) {
-        console.log("⚠️ My state not found");
-        updateVideoTimes(0, masterState.currentTime); // Kendi süreyi 0 göster
-        return;
-      }
-      
-      // *** UI'Yİ DOĞRU ŞEKİLDE GÜNCELLE ***
-      updateVideoTimes(myState.currentTime, masterState.currentTime);
-      
-      // *** GELİŞTİRİLMİŞ SYNC İŞLEMİ ***
-      performImprovedSync(masterState, myState);
-      
-    } catch (error) {
-      console.error("Video state change error:", error);
+  function stopVideoSyncTimer() {
+    if (videoSync.activeTimer) {
+      clearInterval(videoSync.activeTimer);
+      videoSync.activeTimer = null;
+      console.log("🛑 Video sync timer stopped");
     }
   }
   
-  // ================== GELİŞTİRİLMİŞ SYNC FONKSİYONU ==================
-  
-  async function performImprovedSync(masterState, myState) {
-    const now = Date.now();
-    
-    // *** LOOP PREVENTION CHECKS - DAHA DETAYLI ***
-    
-    // 1. Zaten sync yapılıyor mu?
-    if (videoSync.syncing) {
-      console.log("🚫 Already syncing, skipping");
-      return;
-    }
-    
-    // 2. Cooldown period kontrolü
-    if (now - videoSync.lastSyncTime < videoSync.syncCooldown) {
-      const remaining = videoSync.syncCooldown - (now - videoSync.lastSyncTime);
-      console.log(`⏳ Sync cooldown active: ${remaining}ms remaining`);
-      return;
-    }
-    
-    // 3. State'lerin güncel olup olmadığını kontrol et
-    const masterAge = now - masterState.timestamp;
-    const myAge = now - myState.timestamp;
-    
-    if (masterAge > 10000 || myAge > 10000) {
-      console.log("⚠️ Stale state detected, skipping sync", {
-        masterAge: masterAge,
-        myAge: myAge
-      });
-      return;
-    }
-    
-    // *** FARK HESAPLAMA VE KARAR VERME ***
-    const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
-    const pauseStateDiff = myState.paused !== masterState.paused;
-    
-    // Çok küçük farklar için sync yapma (titreme önleme)
-    if (timeDiff < 1.0 && !pauseStateDiff) {
-      updateSyncStatus(`✅ Synced - ${timeDiff.toFixed(1)}s diff`);
-      
-      // Reset consecutive counter
-      if (videoSync.consecutiveSyncs > 0) {
-        videoSync.consecutiveSyncs = 0;
-      }
-      return;
-    }
-    
-    // Büyük farklar için acil sync
-    const needsUrgentSync = timeDiff > videoSync.urgentSyncThreshold;
-    const needsTimeSync = timeDiff > videoSync.maxSyncDifference;
-    
-    if (!needsTimeSync && !pauseStateDiff) {
-      updateSyncStatus(`✅ Close enough - ${timeDiff.toFixed(1)}s diff`);
-      return;
-    }
-    
-    // *** SYNC İŞLEMİNİ GERÇEKLEŞTİR ***
-    
-    console.log("🔄 Performing improved sync:", {
-      masterTime: masterState.currentTime.toFixed(2),
-      myTime: myState.currentTime.toFixed(2),
-      timeDiff: timeDiff.toFixed(2),
-      pauseStateDiff,
-      needsUrgentSync,
-      consecutiveAttempt: videoSync.consecutiveSyncs + 1
-    });
-    
-    videoSync.syncing = true;
-    videoSync.lastSyncTime = now;
-    videoSync.consecutiveSyncs++;
-    
-    try {
-      updateSyncStatus("🔄 Synchronizing...");
-      
-      let syncSuccess = false;
-      
-      // *** 1. PAUSE/PLAY STATE SYNC (ÖNCE BU) ***
-      if (pauseStateDiff) {
-        console.log(`🎬 Syncing play state: ${myState.paused ? 'paused' : 'playing'} → ${masterState.paused ? 'paused' : 'playing'}`);
-        
-        if (masterState.paused && !myState.paused) {
-          console.log("⏸️ Syncing to pause");
-          const pauseSuccess = await executeVideoAction('pauseVideo');
-          if (pauseSuccess) {
-            await sleep(300); // Kısa bekleme
-          }
-        } else if (!masterState.paused && myState.paused) {
-          console.log("▶️ Syncing to play");
-          const playSuccess = await executeVideoAction('playVideo');
-          if (playSuccess) {
-            await sleep(300); // Kısa bekleme
-          }
-        }
-      }
-      
-      // *** 2. TIME SYNC (SONRA BU) ***
-      if (needsTimeSync) {
-        console.log(`⏭️ Syncing time: ${myState.currentTime.toFixed(2)}s → ${masterState.currentTime.toFixed(2)}s (diff: ${timeDiff.toFixed(2)}s)`);
-        
-        // Acil sync için daha aggressive yaklaşım
-        const targetTime = needsUrgentSync ? masterState.currentTime + 0.5 : masterState.currentTime;
-        
-        const timeSuccess = await executeVideoAction('setVideoTime', targetTime);
-        
-        if (timeSuccess) {
-          console.log("✅ Time sync successful");
-          syncSuccess = true;
-          
-          // Sync sonrası play state'ini tekrar kontrol et
-          if (!masterState.paused) {
-            setTimeout(async () => {
-              const currentState = await getVideoState();
-              if (currentState.success && currentState.paused) {
-                console.log("🔄 Restarting video after time sync");
-                await executeVideoAction('playVideo');
-              }
-            }, 800);
-          }
-        } else {
-          console.log("❌ Time sync failed");
-        }
-      } else {
-        // Sadece play/pause sync yapıldı
-        syncSuccess = true;
-      }
-      
-      // *** SYNC SONUCU ***
-      if (syncSuccess) {
-        updateSyncStatus(`✅ Synced successfully`);
-        videoSync.consecutiveSyncs = 0; // Reset counter on success
-      } else {
-        updateSyncStatus(`❌ Sync failed`);
-      }
-      
-    } catch (error) {
-      console.error("Sync error:", error);
-      updateSyncStatus("❌ Sync error");
-    } finally {
-      // Always clear syncing flag after delay
-      setTimeout(() => {
-        videoSync.syncing = false;
-      }, 1500);
-    }
-  }
-  
-  async function getVideoState() {
-    return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.runtime) {
-        resolve({ success: false, error: "Chrome runtime not available" });
-        return;
-      }
-      
-      chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          resolve(response || { success: false });
-        }
-      });
-    });
-  }
-  
-  async function executeVideoAction(action, value = null) {
-    return new Promise((resolve) => {
-      if (typeof chrome === 'undefined' || !chrome.runtime) {
-        resolve(false);
-        return;
-      }
-      
-      const message = { action };
-      if (value !== null) message.currentTime = value;
-      
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(`Video action ${action} error:`, chrome.runtime.lastError);
-          resolve(false);
-        } else {
-          resolve(response?.success || false);
-        }
-      });
-    });
-  }
-  
-  function stopVideoSync() {
-    if (videoSync.active) {
-      videoSync.active = false;
-      
-      if (videoSync.updateTimer) {
-        clearInterval(videoSync.updateTimer);
-        videoSync.updateTimer = null;
-      }
-      
-      if (videoSync.followerTimer) {
-        clearInterval(videoSync.followerTimer);
-        videoSync.followerTimer = null;
-      }
-      
-      if (videoSync.listener && videoSync.roomRef) {
-        videoSync.roomRef.off('value', videoSync.listener);
-        videoSync.listener = null;
-      }
-      
-      if (videoSync.myRef) {
-        videoSync.myRef.remove();
-      }
-      
-      videoSync.lastState = null;
-      videoSync.syncing = false;
-      videoSync.lastSyncTime = 0;
-      videoSync.consecutiveSyncs = 0;
-      
-      updateSyncStatus("⏸️ Video sync stopped");
-      updateVideoTimes(0, 0);
-      
-      console.log("🛑 Video sync stopped");
-    }
-  }
-  
-  // ================== ROOM MANAGEMENT ==================
-  
-  function initRoomManagement() {
-    // Create video code
-    if (elements.createVideoChatCodeBtn) {
-      elements.createVideoChatCodeBtn.addEventListener("click", async () => {
-        const code = generateCode();
-        try {
-          await appState.database.ref(`videoRooms/${code}`).set({
-            createdBy: appState.currentUser,
-            createdAt: Date.now()
-          });
-          
-          if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = code;
-          if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.remove("hidden");
-          showMessage("Video room code created: " + code);
-        } catch (error) {
-          showMessage("Code creation error!", true);
-        }
-      });
-    }
-    
-    // Create chat code
-    if (elements.createChatCodeBtn) {
-      elements.createChatCodeBtn.addEventListener("click", async () => {
-        const code = generateCode();
-        try {
-          await appState.database.ref(`chatRooms/${code}`).set({
-            createdBy: appState.currentUser,
-            createdAt: Date.now()
-          });
-          
-          if (elements.generatedChatCode) elements.generatedChatCode.textContent = code;
-          if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.remove("hidden");
-          showMessage("Chat room code created: " + code);
-        } catch (error) {
-          showMessage("Code creation error!", true);
-        }
-      });
-    }
-    
-    // Copy codes
-    if (elements.copyVideoCodeBtn) {
-      elements.copyVideoCodeBtn.addEventListener("click", () => {
-        const code = elements.generatedVideoCode?.textContent;
-        if (code && code !== "-") {
-          copyToClipboard(code, "Video code copied!");
-        }
-      });
-    }
-    
-    if (elements.copyChatCodeBtn) {
-      elements.copyChatCodeBtn.addEventListener("click", () => {
-        const code = elements.generatedChatCode?.textContent;
-        if (code && code !== "-") {
-          copyToClipboard(code, "Chat code copied!");
-        }
-      });
-    }
-    
-    // Join video room
-    if (elements.joinVideoRoomBtn) {
-      elements.joinVideoRoomBtn.addEventListener("click", async () => {
-        const code = elements.videoCodeInput?.value?.trim();
-        if (!code) {
-          showMessage("Please enter a video room code!", true);
-          return;
-        }
-        
-        try {
-          const snapshot = await appState.database.ref(`videoRooms/${code}`).once('value');
-          if (snapshot.exists()) {
-            appState.currentVideoRoom = code;
-            if (elements.currentVideoCode) elements.currentVideoCode.textContent = code;
-            if (elements.videoContainer) elements.videoContainer.classList.remove("hidden");
-            
-            // Switch to video tab
-            const videoTab = document.querySelector('.nav-tab[data-tab="video"]');
-            if (videoTab) videoTab.click();
-            
-            // Start systems
-            await startMasterFollowerSystem(code);
-            await startVideoSync(code);
-            
-            showMessage("Joined video room!");
-          } else {
-            showMessage("Invalid video room code!", true);
-          }
-        } catch (error) {
-          showMessage("Room join error!", true);
-        }
-      });
-    }
-    
-    // Join chat room
-    if (elements.joinChatRoomBtn) {
-      elements.joinChatRoomBtn.addEventListener("click", async () => {
-        const code = elements.chatCodeInput?.value?.trim();
-        if (!code) {
-          showMessage("Please enter a chat room code!", true);
-          return;
-        }
-        
-        try {
-          const snapshot = await appState.database.ref(`chatRooms/${code}`).once('value');
-          if (snapshot.exists()) {
-            appState.currentChatRoom = code;
-            if (elements.currentChatCode) elements.currentChatCode.textContent = code;
-            if (elements.chatContainer) elements.chatContainer.classList.remove("hidden");
-            
-            // Switch to chat tab
-            const chatTab = document.querySelector('.nav-tab[data-tab="chat"]');
-            if (chatTab) chatTab.click();
-            
-            startChatSystem(code);
-            showMessage("Joined chat room!");
-          } else {
-            showMessage("Invalid chat room code!", true);
-          }
-        } catch (error) {
-          showMessage("Chat join error!", true);
-        }
-      });
-    }
-    
-    // Close rooms
-    if (elements.closeVideoChat) {
-      elements.closeVideoChat.addEventListener("click", () => {
-        stopVideoSync();
-        stopMasterFollowerSystem();
-        stopWebRTC();
-        
-        appState.currentVideoRoom = "";
-        if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
-        if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
-        if (elements.videoCodeInput) elements.videoCodeInput.value = "";
-        
-        // Return to rooms tab
-        const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
-        if (roomsTab) roomsTab.click();
-        
-        showMessage("Video room closed.");
-      });
-    }
-    
-    if (elements.closeChatRoom) {
-      elements.closeChatRoom.addEventListener("click", () => {
-        stopChatSystem();
-        
-        appState.currentChatRoom = "";
-        if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
-        if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
-        if (elements.chatCodeInput) elements.chatCodeInput.value = "";
-        
-        // Return to rooms tab
-        const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
-        if (roomsTab) roomsTab.click();
-        
-        showMessage("Chat room closed.");
-      });
-    }
-    
-    console.log("🏠 Room management initialized");
-  }
-  
-  function copyToClipboard(text, successMessage) {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        showMessage(successMessage);
-      }).catch(() => {
-        fallbackCopyToClipboard(text, successMessage);
-      });
-    } else {
-      fallbackCopyToClipboard(text, successMessage);
-    }
-  }
-  
-  function fallbackCopyToClipboard(text, successMessage) {
-    const tempInput = document.createElement("input");
-    tempInput.value = text;
-    document.body.appendChild(tempInput);
-    tempInput.select();
-    document.execCommand("copy");
-    document.body.removeChild(tempInput);
-    showMessage(successMessage);
-  }
-  
-  // ================== MASTER TOGGLE ==================
-  
-  function initMasterToggle() {
-    if (elements.masterToggleBtn) {
-      elements.masterToggleBtn.addEventListener("click", async () => {
-        if (!masterSystem.active) {
-          showMessage("Master system not active!", true);
-          return;
-        }
-        
-        try {
-          const usersSnapshot = await masterSystem.usersRef.once('value');
-          const users = usersSnapshot.val() || {};
-          const onlineUsers = Object.keys(users).filter(user => users[user].online);
-          
-          if (onlineUsers.length < 2) {
-            showMessage("At least 2 users required!", true);
-            return;
-          }
-          
-          const currentIndex = onlineUsers.indexOf(masterSystem.currentMaster);
-          const nextIndex = (currentIndex + 1) % onlineUsers.length;
-          const nextMaster = onlineUsers[nextIndex];
-          
-          await setMaster(nextMaster);
-          showMessage(`Master changed to: ${nextMaster}`);
-        } catch (error) {
-          console.error("Master switching error:", error);
-          showMessage("Master switching error!", true);
-        }
-      });
-    }
-  }
-  
-  // ================== CHAT SYSTEM ==================
-  
-  function startChatSystem(roomId) {
-    console.log("💬 Starting chat system...");
-    
-    try {
-      chatSystem.active = true;
-      chatSystem.messagesRef = appState.database.ref(`chatMessages/${roomId}`);
-      
-      chatSystem.listener = chatSystem.messagesRef.on("value", (snapshot) => {
-        if (elements.messagesContainer) {
-          elements.messagesContainer.innerHTML = "";
-          
-          if (snapshot.exists()) {
-            const messages = snapshot.val();
-            Object.entries(messages)
-              .sort(([,a], [,b]) => a.timestamp - b.timestamp)
-              .forEach(([key, message]) => displayMessage(message));
-            
-            scrollToBottom();
-          }
-        }
-      });
-      
-      setupMessageSending();
-      
-      console.log("✅ Chat system started");
-      
-    } catch (error) {
-      console.error("❌ Chat startup error:", error);
-      showMessage("Chat system error!", true);
-    }
-  }
-  
-  function setupMessageSending() {
-    if (elements.sendMessageBtn) {
-      elements.sendMessageBtn.onclick = sendMessage;
-    }
-    
-    if (elements.messageInput) {
-      elements.messageInput.onkeypress = (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          sendMessage();
-        }
-      };
-    }
-  }
-  
-  async function sendMessage() {
-    const message = elements.messageInput?.value?.trim();
-    if (!message || !chatSystem.active) return;
-    
-    try {
-      await chatSystem.messagesRef.push({
-        sender: appState.currentUser,
-        text: message,
-        timestamp: Date.now()
-      });
-      
-      if (elements.messageInput) elements.messageInput.value = "";
-      
-    } catch (error) {
-      console.error("Message sending error:", error);
-      showMessage("Message sending error!", true);
-    }
-  }
-  
-  function displayMessage(message) {
-    if (!elements.messagesContainer) return;
-    
-    const messageEl = document.createElement("div");
-    messageEl.textContent = `${message.sender}: ${message.text}`;
-    messageEl.className = message.sender === appState.currentUser ? "sent-message" : "received-message";
-    
-    const colors = ["#8b5cf6", "#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
-    const colorIndex = message.sender.charCodeAt(0) % colors.length;
-    messageEl.style.backgroundColor = colors[colorIndex];
-    
-    elements.messagesContainer.appendChild(messageEl);
-  }
-  
-  function scrollToBottom() {
-    if (elements.messagesContainer) {
-      elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
-    }
-  }
-  
-  function stopChatSystem() {
-    if (chatSystem.active) {
-      chatSystem.active = false;
-      
-      if (chatSystem.listener && chatSystem.messagesRef) {
-        chatSystem.messagesRef.off("value", chatSystem.listener);
-        chatSystem.listener = null;
-      }
-      
-      if (elements.messagesContainer) {
-        elements.messagesContainer.innerHTML = "";
-      }
-      
-      console.log("🛑 Chat system stopped");
-    }
-  }
-  
-  // ================== WEBRTC VIDEO CHAT ==================
-  
-  function initWebRTC() {
-    if (!elements.startButton || !elements.hangupButton) return;
-    
-    // Start button
-    elements.startButton.onclick = async () => {
-      try {
-        updateVideoStatus("Starting camera...");
-        
-        webrtcSystem.localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
-        
-        if (elements.localVideo) {
-          elements.localVideo.srcObject = webrtcSystem.localStream;
-          elements.localVideo.style.transform = "scaleX(-1)";
-        }
-        
-        elements.startButton.disabled = true;
-        elements.hangupButton.disabled = false;
-        
-        updateVideoStatus("Call started");
-        updateMediaButtons();
-        
-        if (appState.currentVideoRoom) {
-          await setupWebRTCSignaling(appState.currentVideoRoom);
-        }
-        
-      } catch (error) {
-        console.error("Camera startup error:", error);
-        updateVideoStatus("Camera/microphone access error: " + error.message);
-        elements.startButton.disabled = false;
-      }
-    };
-    
-    // Hangup button
-    elements.hangupButton.onclick = () => {
-      stopWebRTC();
-    };
-    
-    // Camera toggle
-    if (elements.cameraToggle) {
-      elements.cameraToggle.onclick = () => {
-        if (webrtcSystem.localStream) {
-          const videoTrack = webrtcSystem.localStream.getVideoTracks()[0];
-          if (videoTrack) {
-            webrtcSystem.isCameraOn = !webrtcSystem.isCameraOn;
-            videoTrack.enabled = webrtcSystem.isCameraOn;
-            updateMediaButtons();
-            updateVideoStatus(webrtcSystem.isCameraOn ? "Camera on" : "Camera off");
-          }
-        }
-      };
-    }
-    
-    // Microphone toggle
-    if (elements.micToggle) {
-      elements.micToggle.onclick = () => {
-        if (webrtcSystem.localStream) {
-          const audioTrack = webrtcSystem.localStream.getAudioTracks()[0];
-          if (audioTrack) {
-            webrtcSystem.isMicOn = !webrtcSystem.isMicOn;
-            audioTrack.enabled = webrtcSystem.isMicOn;
-            updateMediaButtons();
-            updateVideoStatus(webrtcSystem.isMicOn ? "Microphone on" : "Microphone off");
-          }
-        }
-      };
-    }
-    
-    console.log("📹 WebRTC initialized");
-  }
-  
-  async function setupWebRTCSignaling(roomId) {
-    try {
-      webrtcSystem.roomRef = appState.database.ref(`webrtcRooms/${roomId}`);
-      
-      const roomSnapshot = await webrtcSystem.roomRef.once('value');
-      
-      if (!roomSnapshot.exists()) {
-        await createWebRTCRoom();
-      } else {
-        await joinWebRTCRoom();
-      }
-      
-    } catch (error) {
-      console.error("WebRTC signaling error:", error);
-      updateVideoStatus("Connection error: " + error.message);
-    }
-  }
-  
-  async function createWebRTCRoom() {
-    try {
-      updateVideoStatus("Creating room...");
-      
-      webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
-      setupPeerConnectionEvents();
-      
-      if (webrtcSystem.localStream) {
-        webrtcSystem.localStream.getTracks().forEach(track => {
-          webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
-        });
-      }
-      
-      collectICECandidates('caller', 'callee');
-      
-      const offer = await webrtcSystem.peerConnection.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
-      await webrtcSystem.peerConnection.setLocalDescription(offer);
-      
-      await webrtcSystem.roomRef.set({
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp
-        },
-        created: Date.now()
-      });
-      
-      webrtcSystem.roomRef.on('value', async (snapshot) => {
-        const data = snapshot.val();
-        if (data?.answer && webrtcSystem.peerConnection.signalingState === 'have-local-offer') {
-          try {
-            const answer = new RTCSessionDescription(data.answer);
-            await webrtcSystem.peerConnection.setRemoteDescription(answer);
-            updateVideoStatus("Answer received, connecting...");
-          } catch (error) {
-            console.error("Answer processing error:", error);
-            updateVideoStatus("Connection error");
-          }
-        }
-      });
-      
-      updateVideoStatus("Waiting for participant...");
-      
-    } catch (error) {
-      console.error("Room creation error:", error);
-      updateVideoStatus("Room creation error: " + error.message);
-    }
-  }
-  
-  async function joinWebRTCRoom() {
-    try {
-      updateVideoStatus("Joining room...");
-      
-      const roomSnapshot = await webrtcSystem.roomRef.once('value');
-      const roomData = roomSnapshot.val();
-      
-      if (!roomData?.offer) {
-        updateVideoStatus("Invalid room");
-        return;
-      }
-      
-      webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
-      setupPeerConnectionEvents();
-      
-      if (webrtcSystem.localStream) {
-        webrtcSystem.localStream.getTracks().forEach(track => {
-          webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
-        });
-      }
-      
-      collectICECandidates('callee', 'caller');
-      
-      const offer = new RTCSessionDescription(roomData.offer);
-      await webrtcSystem.peerConnection.setRemoteDescription(offer);
-      
-      const answer = await webrtcSystem.peerConnection.createAnswer();
-      await webrtcSystem.peerConnection.setLocalDescription(answer);
-      
-      await webrtcSystem.roomRef.update({
-        answer: {
-          type: answer.type,
-          sdp: answer.sdp
-        }
-      });
-      
-      updateVideoStatus("Connecting...");
-      
-    } catch (error) {
-      console.error("Room join error:", error);
-      updateVideoStatus("Room join error: " + error.message);
-    }
-  }
-  
-  function setupPeerConnectionEvents() {
-    if (!webrtcSystem.peerConnection) return;
-    
-    webrtcSystem.remoteStream = new MediaStream();
-    if (elements.remoteVideo) {
-      elements.remoteVideo.srcObject = webrtcSystem.remoteStream;
-      
-      elements.remoteVideo.style.transform = "scaleX(-1)";
+  // ================== MASTER STATE BULMA - DÜZELTİLMİŞ ==================
 
-    }
-    
-    webrtcSystem.peerConnection.ontrack = (event) => {
-      console.log("Remote track received");
-      event.streams[0].getTracks().forEach(track => {
-        webrtcSystem.remoteStream.addTrack(track);
-      });
-    };
-    
-    webrtcSystem.peerConnection.onconnectionstatechange = () => {
-      const state = webrtcSystem.peerConnection.connectionState;
-      console.log("Connection state:", state);
-      
-      switch (state) {
-        case 'connected':
-          updateVideoStatus("Connected! Call is active.");
-          break;
-        case 'disconnected':
-          updateVideoStatus("Connection lost");
-          break;
-        case 'failed':
-          updateVideoStatus("Connection failed");
-          break;
-      }
-    };
+function findMasterState(states) {
+  const masterUser = masterSystem.currentMaster;
+  
+  if (!masterUser) {
+    console.log("⚠️ No current master set");
+    return null;
   }
   
-  function collectICECandidates(localName, remoteName) {
-    const localCandidatesRef = webrtcSystem.roomRef.child(`${localName}Candidates`);
-    const remoteCandidatesRef = webrtcSystem.roomRef.child(`${remoteName}Candidates`);
-    
-    webrtcSystem.peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log(`📡 ${localName} ICE candidate sending`);
-        localCandidatesRef.push(event.candidate.toJSON()).catch(error => {
-          console.error("ICE candidate sending error:", error);
-        });
-      }
-    };
-    
-    remoteCandidatesRef.on('child_added', async (snapshot) => {
-      const candidateData = snapshot.val();
-      console.log(`📡 ${remoteName} ICE candidate received`);
-      
-      try {
-        const candidate = new RTCIceCandidate(candidateData);
-        await webrtcSystem.peerConnection.addIceCandidate(candidate);
-        console.log(`✅ ${remoteName} ICE candidate added`);
-      } catch (error) {
-        console.error(`❌ ${remoteName} ICE candidate add error:`, error);
-      }
-    });
+  const masterState = states[masterUser];
+  
+  if (!masterState) {
+    console.log(`⚠️ Master ${masterUser} state not found in Firebase`);
+    return null;
   }
   
-  function updateMediaButtons() {
-    if (elements.cameraToggle) {
-      const cameraOn = elements.cameraToggle.querySelector('.camera-on');
-      const cameraOff = elements.cameraToggle.querySelector('.camera-off');
-      
-      if (cameraOn && cameraOff) {
-        if (webrtcSystem.isCameraOn) {
-          cameraOn.classList.remove('hidden');
-          cameraOff.classList.add('hidden');
-          elements.cameraToggle.classList.add('active');
-          elements.cameraToggle.classList.remove('inactive');
-        } else {
-          cameraOn.classList.add('hidden');
-          cameraOff.classList.remove('hidden');
-          elements.cameraToggle.classList.remove('active');
-          elements.cameraToggle.classList.add('inactive');
-        }
-      }
-    }
-    
-    if (elements.micToggle) {
-      const micOn = elements.micToggle.querySelector('.mic-on');
-      const micOff = elements.micToggle.querySelector('.mic-off');
-      
-      if (micOn && micOff) {
-        if (webrtcSystem.isMicOn) {
-          micOn.classList.remove('hidden');
-          micOff.classList.add('hidden');
-          elements.micToggle.classList.add('active');
-          elements.micToggle.classList.remove('inactive');
-        } else {
-          micOn.classList.add('hidden');
-          micOff.classList.remove('hidden');
-          elements.micToggle.classList.remove('active');
-          elements.micToggle.classList.add('inactive');
-        }
-      }
-    }
+  // *** YENİ: Timestamp kontrolü ***
+  const stateAge = Date.now() - masterState.timestamp;
+  if (stateAge > 15000) {
+    console.log(`⚠️ Master state too old: ${stateAge}ms`);
+    return null;
   }
   
-  function updateVideoStatus(message) {
-    if (elements.videoStatus) {
-      elements.videoStatus.textContent = message;
-    }
-    console.log("📹", message);
+  // *** YENİ: Temel değer kontrolleri ***
+  if (typeof masterState.currentTime !== 'number' || isNaN(masterState.currentTime) || masterState.currentTime < 0) {
+    console.log(`⚠️ Invalid master currentTime: ${masterState.currentTime}`);
+    return null;
   }
   
-  function stopWebRTC() {
-    if (webrtcSystem.localStream) {
-      webrtcSystem.localStream.getTracks().forEach(track => track.stop());
-      webrtcSystem.localStream = null;
-    }
-    
-    if (webrtcSystem.remoteStream) {
-      webrtcSystem.remoteStream.getTracks().forEach(track => track.stop());
-      webrtcSystem.remoteStream = null;
-    }
-    
-    if (webrtcSystem.peerConnection) {
-      webrtcSystem.peerConnection.close();
-      webrtcSystem.peerConnection = null;
-    }
-    
-    if (webrtcSystem.roomRef) {
-      webrtcSystem.roomRef.off();
-      webrtcSystem.roomRef = null;
-    }
-    
-    if (elements.localVideo) elements.localVideo.srcObject = null;
-    if (elements.remoteVideo) elements.remoteVideo.srcObject = null;
-    
-    if (elements.startButton) elements.startButton.disabled = false;
-    if (elements.hangupButton) elements.hangupButton.disabled = true;
-    
-    webrtcSystem.isCameraOn = true;
-    webrtcSystem.isMicOn = true;
-    
-    updateVideoStatus("Call ended");
-    console.log("🛑 WebRTC stopped");
-  }
-  
-  // ================== CLEANUP FUNCTIONS ==================
-  
-  function cleanup() {
-    console.log("🧹 Cleaning up...");
-    
-    stopVideoSync();
-    stopMasterFollowerSystem();
-    stopChatSystem();
-    stopWebRTC();
-    
-    appState.currentVideoRoom = "";
-    appState.currentChatRoom = "";
-    
-    resetUI();
-    
-    console.log("✅ Cleanup completed");
-  }
-  
-  function resetUI() {
-    if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
-    if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
-    if (elements.videoCodeInput) elements.videoCodeInput.value = "";
-    if (elements.chatCodeInput) elements.chatCodeInput.value = "";
-    
-    if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
-    if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
-    if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.add("hidden");
-    if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.add("hidden");
-    
-    updateSyncStatus("⏸️ Synchronization off");
-    updateVideoTimes(0, 0);
-    
-    if (elements.masterStatus) elements.masterStatus.textContent = "---";
-    if (elements.currentMaster) elements.currentMaster.textContent = "---";
-    if (elements.videoStatus) elements.videoStatus.textContent = "Click to start call";
-    
-    if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = "-";
-    if (elements.generatedChatCode) elements.generatedChatCode.textContent = "-";
-  }
-  
-  // ================== DEBUG VE MONİTORİNG ==================
-  
-  // Sync durumunu izlemek için debug fonksiyonu
-  function getSyncDebugInfo() {
-    return {
-      timestamp: Date.now(),
-      videoSyncActive: videoSync.active,
-      masterSystemActive: masterSystem.active,
-      iAmMaster: masterSystem.iAmMaster,
-      currentMaster: masterSystem.currentMaster,
-      syncing: videoSync.syncing,
-      lastSyncTime: videoSync.lastSyncTime,
-      consecutiveSyncs: videoSync.consecutiveSyncs,
-      cooldownRemaining: Math.max(0, videoSync.syncCooldown - (Date.now() - videoSync.lastSyncTime)),
-      timers: {
-        updateTimer: !!videoSync.updateTimer,
-        followerTimer: !!videoSync.followerTimer
-      },
-      settings: {
-        syncCooldown: videoSync.syncCooldown,
-        maxSyncDifference: videoSync.maxSyncDifference,
-        urgentSyncThreshold: videoSync.urgentSyncThreshold,
-        maxConsecutiveSyncs: videoSync.maxConsecutiveSyncs
-      }
-    };
-  }
-  
-  // Manuel sync reset fonksiyonu
-  function resetSyncState() {
-    videoSync.syncing = false;
-    videoSync.lastSyncTime = 0;
-    videoSync.consecutiveSyncs = 0;
-    console.log("🔄 Sync state manually reset");
-    updateSyncStatus("🔄 Sync reset");
-  }
-  
-  // Advanced debug fonksiyonu
-  function forceVideoSync() {
-    if (!videoSync.active || masterSystem.iAmMaster) {
-      console.log("❌ Cannot force sync - not a follower or sync not active");
+  console.log(`👑 Master state found: ${masterUser} at ${masterState.currentTime.toFixed(1)}s`);
+  return masterState;
+}
+
+  function validateStateObject(state, source) {
+    if (!state) {
+      console.warn(`⚠️ Null state from ${source}`);
       return false;
     }
     
-    console.log("🔧 Forcing video sync...");
-    videoSync.syncing = false;
-    videoSync.lastSyncTime = 0;
-    videoSync.consecutiveSyncs = 0;
+    if (typeof state.currentTime !== 'number' || isNaN(state.currentTime) || state.currentTime < 0) {
+      console.warn(`⚠️ Invalid currentTime from ${source}:`, state.currentTime);
+      return false;
+    }
+    
+    if (typeof state.paused !== 'boolean') {
+      console.warn(`⚠️ Invalid paused state from ${source}:`, state.paused);
+      return false;
+    }
+    
+    if (!state.timestamp || typeof state.timestamp !== 'number') {
+      console.warn(`⚠️ Invalid timestamp from ${source}:`, state.timestamp);
+      return false;
+    }
+    
+    const stateAge = Date.now() - state.timestamp;
+    if (stateAge > 15000) {
+      console.warn(`⚠️ Stale state from ${source}, age: ${stateAge}ms`);
+      return false;
+    }
+    
     return true;
   }
   
-  // ================== STARTUP SYSTEM ==================
-  
-  function initApp() {
-    console.log("🚀 Tamamen Tamir Edilmiş Video Sync App v5 starting...");
-    
-    try {
-      if (!initFirebase()) {
-        throw new Error("Firebase could not be initialized");
-      }
-      
-      setupPasswordValidation();
-      initTabNavigation();
-      initAuth();
-      initRoomManagement();
-      initMasterToggle();
-      initWebRTC();
-      
-      setInitialUIState();
-      setupGlobalEventListeners();
-      
-      appState.initialized = true;
-      console.log("✅ Tamamen tamir edilmiş app successfully started");
-      showMessage("Fixed Video Sync App v5 ready!");
-      
-    } catch (error) {
-      console.error("❌ App startup error:", error);
-      showMessage("Application startup error: " + error.message, true);
-    }
-  }
-  
-  function setInitialUIState() {
-    if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
-    if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
-    if (elements.appContainer) elements.appContainer.classList.add("hidden");
-    
-    if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
-    if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
-    
-    if (elements.roomsSection) elements.roomsSection.classList.remove("hidden");
-    
-    const firstTab = document.querySelector('.nav-tab[data-tab="rooms"]');
-    if (firstTab) firstTab.classList.add('active');
-    
-    resetUI();
-    
-    console.log("🎨 Initial UI state set");
-  }
-  
-  function setupGlobalEventListeners() {
-    window.addEventListener('error', (event) => {
-      console.error("🚨 Global error:", event.error);
-      showMessage("System error occurred!", true);
-    });
-    
-    window.addEventListener('unhandledrejection', (event) => {
-      console.error("🚨 Promise rejection:", event.reason);
-      showMessage("Connection error!", true);
-    });
-    
-    window.addEventListener('beforeunload', () => {
-      console.log("📄 Page closing, cleaning up...");
-      cleanup();
-    });
-    
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        console.log("👁️ Tab hidden");
-      } else {
-        console.log("👁️ Tab visible");
-        if (masterSystem.active && masterSystem.usersRef) {
-          masterSystem.usersRef.child(appState.currentUser).update({
-            lastSeen: Date.now(),
-            online: true
-          });
-        }
-      }
-    });
-    
-    console.log("🔧 Global event listeners set up");
-  }
-  
-  // ================== GLOBAL API - GELİŞTİRİLMİŞ ==================
-  
-  window.videoSyncApp = {
-    version: "5.0.0-completely-fixed",
-    appState,
-    masterSystem,
-    videoSync,
-    chatSystem,
-    webrtcSystem,
-    elements,
-    
-    // Core functions
-    cleanup,
-    showMessage,
-    updateSyncStatus,
-    
-    // Debug functions
-    getSyncDebugInfo,
-    resetSyncState,
-    forceVideoSync,
-    
-    // Status function
-    getStatus: () => ({
-      initialized: appState.initialized,
-      currentUser: appState.currentUser,
-      currentVideoRoom: appState.currentVideoRoom,
-      currentChatRoom: appState.currentChatRoom,
-      masterActive: masterSystem.active,
-      videoSyncActive: videoSync.active,
-      chatActive: chatSystem.active,
-      iAmMaster: masterSystem.iAmMaster,
-      syncing: videoSync.syncing,
-      lastSyncTime: videoSync.lastSyncTime,
-      consecutiveSyncs: videoSync.consecutiveSyncs,
-      version: "5.0.0-completely-fixed"
-    }),
-    
-    // Convenience functions
-    resetSync: resetSyncState,
-    debugSync: getSyncDebugInfo,
-    forceSync: forceVideoSync,
-    
-    // Advanced debug
-    getVideoState: getVideoState,
-    executeVideoAction: executeVideoAction
-  };
-  
-  // Start the app
-  initApp();
-  
-  console.log("🎉 Tamamen Tamir Edilmiş Video Sync App v5 fully loaded!");
-  console.log("📋 Available debug commands:");
-  console.log("  - window.videoSyncApp.getStatus()");
-  console.log("  - window.videoSyncApp.getSyncDebugInfo()");
-  console.log("  - window.videoSyncApp.resetSyncState()");
-  console.log("  - window.videoSyncApp.forceVideoSync()");
-  console.log("🔧 Emergency functions:");
-  console.log("  - window.videoSyncApp.cleanup()");
-  console.log("  - window.videoSyncApp.resetSync()");
-  
-  // ================== MEVCUT KOD SONU (sidepanel.js'nin son satırları) ==================
+  // ================== VIDEO STATE CHANGE HANDLER - DÜZELTİLMİŞ ==================
 
-  // Final ready message with performance info
-  setTimeout(() => {
-    const debugInfo = getSyncDebugInfo();
-    console.log("🎯 VİDEO SYNC APP TAMAMEN HAZIR!");
-    console.log(`⏰ Yükleme zamanı: ${new Date().toLocaleString('tr-TR')}`);
-    console.log(`🔢 App versiyon: v5.0.0-completely-fixed`);
-    console.log("🔧 Tamir edilen özellikler:");
-    console.log("  ✅ Master UI süresi düzeltildi");
-    console.log("  ✅ Follower sync takibi iyileştirildi");
-    console.log("  ✅ Role değişiminde timer restart");
-    console.log("  ✅ Geliştirilmiş sync algoritması");
-    console.log("  ✅ Daha iyi hata yönetimi");
-    console.log("  ✅ Kapsamlı debug sistemi");
-    console.log("🏁 Initialization complete - Ready for synchronized video experience!");
-  }, 3000);
-  
-});
-
-// ================== BURADAN YENİ KOD BAŞLIYOR ==================
-// ================== GELİŞTİRİLMİŞ VIDEO SYNC SİSTEMİ - KOPUKLUK FİXLERİ ==================
-
-console.log("🔧 Loading Enhanced Video Sync System...");
-
-// Mevcut video sync nesnesine eklenecek iyileştirmeler
-let enhancedVideoSync = {
-  // YENİ: Daha detaylı state tracking
-  lastMasterState: null,
-  lastMyState: null,
-  stateHistory: [],
-  maxHistorySize: 10,
-  
-  // YENİ: Geliştirilmiş timing ayarları
-  masterBroadcastInterval: 1000,    // Master 1 saniyede bir broadcast (daha stabil)
-  followerReportInterval: 2000,     // Follower 2 saniyede bir rapor
-  stateValidityDuration: 8000,      // State 8 saniye geçerli
-  
-  // YENİ: Adaptif sync parametreleri
-  adaptiveSync: {
-    enabled: true,
-    minSyncThreshold: 1.5,          // Minimum sync eşiği
-    maxSyncThreshold: 3.0,          // Maksimum sync eşiği
-    urgentSyncThreshold: 6.0,       // Acil sync eşiği
-    adaptiveCooldown: 2000,         // Adaptif cooldown
-    maxCooldown: 5000,              // Maksimum cooldown
-    successiveFailures: 0,          // Ardışık başarısızlık sayısı
-    lastSuccessTime: 0              // Son başarılı sync zamanı
-  },
-  
-  // YENİ: Network durumu izleme
-  networkStatus: {
-    latency: 0,
-    lastPingTime: 0,
-    connectionQuality: 'good',      // good, medium, poor
-    retryCount: 0
-  },
-  
-  // YENİ: Geliştirilmiş hata yönetimi
-  errorTracking: {
-    consecutiveErrors: 0,
-    lastErrorTime: 0,
-    errorTypes: {},
-    maxConsecutiveErrors: 5
-  }
-};
-
-// ================== 1. GELİŞTİRİLMİŞ STATE VALİDATION ==================
-
-function validateVideoState(state, source = 'unknown') {
-  if (!state) {
-    console.warn(`⚠️ Null state from ${source}`);
-    return { valid: false, reason: 'null_state' };
-  }
-  
-  // Temel validasyon
-  if (typeof state.currentTime !== 'number' || isNaN(state.currentTime)) {
-    console.warn(`⚠️ Invalid currentTime from ${source}:`, state.currentTime);
-    return { valid: false, reason: 'invalid_time' };
-  }
-  
-  if (state.currentTime < 0) {
-    console.warn(`⚠️ Negative time from ${source}:`, state.currentTime);
-    return { valid: false, reason: 'negative_time' };
-  }
-  
-  if (typeof state.paused !== 'boolean') {
-    console.warn(`⚠️ Invalid paused state from ${source}:`, state.paused);
-    return { valid: false, reason: 'invalid_paused' };
-  }
-  
-  // Timestamp validasyon
-  if (!state.timestamp || typeof state.timestamp !== 'number') {
-    console.warn(`⚠️ Invalid timestamp from ${source}:`, state.timestamp);
-    return { valid: false, reason: 'invalid_timestamp' };
-  }
-  
-  // State yaşı kontrolü
-  const stateAge = Date.now() - state.timestamp;
-  if (stateAge > enhancedVideoSync.stateValidityDuration) {
-    console.warn(`⚠️ Stale state from ${source}, age: ${stateAge}ms`);
-    return { valid: false, reason: 'stale_state', age: stateAge };
-  }
-  
-  return { valid: true };
-}
-
-// ================== 2. ADAPTIF SYNC THRESHOLD SİSTEMİ ==================
-
-function calculateAdaptiveSyncThreshold() {
-  const adaptive = enhancedVideoSync.adaptiveSync;
-  
-  if (!adaptive.enabled) {
-    return videoSync.maxSyncDifference || 2.0;
-  }
-  
-  // Network kalitesine göre threshold ayarla
-  let threshold = adaptive.minSyncThreshold;
-  
-  switch (enhancedVideoSync.networkStatus.connectionQuality) {
-    case 'poor':
-      threshold = adaptive.maxSyncThreshold;
-      break;
-    case 'medium':
-      threshold = (adaptive.minSyncThreshold + adaptive.maxSyncThreshold) / 2;
-      break;
-    case 'good':
-    default:
-      threshold = adaptive.minSyncThreshold;
-      break;
-  }
-  
-  // Ardışık başarısızlıklara göre threshold artır
-  if (adaptive.successiveFailures > 2) {
-    threshold += (adaptive.successiveFailures - 2) * 0.5;
-    threshold = Math.min(threshold, adaptive.maxSyncThreshold);
-  }
-  
-  console.log(`🎯 Adaptive threshold: ${threshold.toFixed(1)}s (quality: ${enhancedVideoSync.networkStatus.connectionQuality}, failures: ${adaptive.successiveFailures})`);
-  return threshold;
-}
-
-function calculateAdaptiveCooldown() {
-  const adaptive = enhancedVideoSync.adaptiveSync;
-  
-  if (!adaptive.enabled) {
-    return videoSync.syncCooldown || 3000;
-  }
-  
-  // Başarısızlık sayısına göre cooldown artır
-  let cooldown = adaptive.adaptiveCooldown;
-  
-  if (adaptive.successiveFailures > 0) {
-    cooldown += adaptive.successiveFailures * 1000; // Her başarısızlık için +1s
-    cooldown = Math.min(cooldown, adaptive.maxCooldown);
-  }
-  
-  return cooldown;
-}
-
-// ================== 3. NETWORK KALİTESİ İZLEME ==================
-
-async function updateNetworkStatus() {
-  const startTime = Date.now();
-  
-  try {
-    // Firebase ping testi
-    if (appState.database) {
-      const testRef = appState.database.ref('.info/connected');
-      const snapshot = await testRef.once('value');
-      
-      const latency = Date.now() - startTime;
-      enhancedVideoSync.networkStatus.latency = latency;
-      enhancedVideoSync.networkStatus.lastPingTime = Date.now();
-      
-      // Bağlantı kalitesini belirle
-      if (latency < 200) {
-        enhancedVideoSync.networkStatus.connectionQuality = 'good';
-      } else if (latency < 500) {
-        enhancedVideoSync.networkStatus.connectionQuality = 'medium';
-      } else {
-        enhancedVideoSync.networkStatus.connectionQuality = 'poor';
-      }
-      
-      console.log(`📡 Network status: ${enhancedVideoSync.networkStatus.connectionQuality} (${latency}ms)`);
-    }
-    
-  } catch (error) {
-    console.error("Network status check failed:", error);
-    enhancedVideoSync.networkStatus.connectionQuality = 'poor';
-    enhancedVideoSync.networkStatus.retryCount++;
-  }
-}
-
-// ================== 4. GELİŞTİRİLMİŞ MASTER BROADCAST ==================
-
-async function enhancedMasterBroadcast() {
-  if (!videoSync.active || !masterSystem.iAmMaster) return;
-  
-  try {
-    const videoState = await getVideoState();
-    
-    if (!videoState.success) {
-      console.warn("⚠️ Master: Video state alınamadı");
-      enhancedVideoSync.errorTracking.consecutiveErrors++;
-      return;
-    }
-    
-    // State validasyonu
-    const validation = validateVideoState(videoState, 'master_local');
-    if (!validation.valid) {
-      console.warn("⚠️ Master: Invalid local state:", validation.reason);
-      enhancedVideoSync.errorTracking.consecutiveErrors++;
-      return;
-    }
-    
-    const masterData = {
-      currentTime: Number(videoState.currentTime.toFixed(3)),
-      paused: Boolean(videoState.paused),
-      url: videoState.videoUrl || window.location.href,
-      timestamp: Date.now(),
-      isMaster: true,
-      nickname: appState.currentUser,
-      playbackRate: videoState.playbackRate || 1,
-      duration: videoState.duration || 0,
-      
-      // YENİ: Ek metadata
-      networkQuality: enhancedVideoSync.networkStatus.connectionQuality,
-      sequenceNumber: Date.now(),
-      broadcastLatency: enhancedVideoSync.networkStatus.latency
-    };
-    
-    // Firebase'e gönder
-    await videoSync.myRef.set(masterData);
-    
-    enhancedVideoSync.lastMasterState = masterData;
-    enhancedVideoSync.errorTracking.consecutiveErrors = 0;
-    
-    // UI güncelle
-    updateVideoTimes(masterData.currentTime, 0);
-    
-    console.log("📤 Enhanced master broadcast:", {
-      time: masterData.currentTime.toFixed(2),
-      paused: masterData.paused,
-      networkQuality: masterData.networkQuality
-    });
-    
-  } catch (error) {
-    console.error("Enhanced master broadcast error:", error);
-    enhancedVideoSync.errorTracking.consecutiveErrors++;
-  }
-}
-
-// ================== 5. GELİŞTİRİLMİŞ FOLLOWER SYNC ==================
-
-async function enhancedFollowerSync(masterState, myState) {
-  const now = Date.now();
-  
-  try {
-    // Validasyon
-    const masterValidation = validateVideoState(masterState, 'master_remote');
-    const myValidation = validateVideoState(myState, 'follower_local');
-    
-    if (!masterValidation.valid || !myValidation.valid) {
-      console.warn("⚠️ Invalid states for sync:", {
-        master: masterValidation.reason,
-        my: myValidation.reason
-      });
-      return false;
-    }
-    
-    // Adaptif threshold ve cooldown
-    const adaptiveThreshold = calculateAdaptiveSyncThreshold();
-    const adaptiveCooldown = calculateAdaptiveCooldown();
-    
-    // Cooldown kontrolü
-    if (now - (videoSync.lastSyncTime || 0) < adaptiveCooldown) {
-      return false;
-    }
-    
-    // Sync gereksinimini analiz et
-    const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
-    const pauseStateDiff = myState.paused !== masterState.paused;
-    
-    // Küçük farklar için sync yapma
-    if (timeDiff < adaptiveThreshold && !pauseStateDiff) {
-      enhancedVideoSync.adaptiveSync.lastSuccessTime = now;
-      enhancedVideoSync.adaptiveSync.successiveFailures = Math.max(0, enhancedVideoSync.adaptiveSync.successiveFailures - 1);
-      updateSyncStatus(`✅ Enhanced sync - ${timeDiff.toFixed(1)}s diff`);
-      return true;
-    }
-    
-    console.log("🔄 Enhanced follower sync:", {
-      masterTime: masterState.currentTime.toFixed(3),
-      myTime: myState.currentTime.toFixed(3),
-      timeDiff: timeDiff.toFixed(3),
-      pauseStateDiff,
-      adaptiveThreshold: adaptiveThreshold.toFixed(1)
-    });
-    
-    // Sync işlemi
-    videoSync.syncing = true;
-    videoSync.lastSyncTime = now;
-    
-    updateSyncStatus("🔄 Enhanced synchronizing...");
-    
-    let syncSuccess = false;
-    
-    // 1. Play/Pause sync
-    if (pauseStateDiff) {
-      if (masterState.paused && !myState.paused) {
-        await executeVideoAction('pauseVideo');
-      } else if (!masterState.paused && myState.paused) {
-        await executeVideoAction('playVideo');
-      }
-      await sleep(200);
-    }
-    
-    // 2. Time sync
-    if (timeDiff > adaptiveThreshold) {
-      let targetTime = masterState.currentTime;
-      
-      // Network gecikmesi kompansasyonu
-      if (enhancedVideoSync.networkStatus.latency > 100) {
-        const compensationFactor = enhancedVideoSync.networkStatus.latency / 1000;
-        if (!masterState.paused) {
-          targetTime += compensationFactor;
-        }
-      }
-      
-      const timeSuccess = await executeVideoAction('setVideoTime', targetTime);
-      syncSuccess = timeSuccess;
-    } else {
-      syncSuccess = true;
-    }
-    
-    // Sonuç
-    if (syncSuccess) {
-      enhancedVideoSync.adaptiveSync.lastSuccessTime = now;
-      enhancedVideoSync.adaptiveSync.successiveFailures = Math.max(0, enhancedVideoSync.adaptiveSync.successiveFailures - 1);
-      updateSyncStatus(`✅ Enhanced sync successful`);
-    } else {
-      enhancedVideoSync.adaptiveSync.successiveFailures++;
-      updateSyncStatus(`❌ Enhanced sync failed`);
-    }
-    
-    return syncSuccess;
-    
-  } catch (error) {
-    console.error("Enhanced follower sync error:", error);
-    enhancedVideoSync.adaptiveSync.successiveFailures++;
-    return false;
-  } finally {
-    setTimeout(() => {
-      videoSync.syncing = false;
-    }, 1000);
-  }
-}
-
-// ================== 6. ENHANCED TIMER SİSTEMİ ==================
-
-function startEnhancedTimers() {
-  // Mevcut timer'ları temizle
-  if (videoSync.updateTimer) {
-    clearInterval(videoSync.updateTimer);
-    videoSync.updateTimer = null;
-  }
-  
-  if (videoSync.followerTimer) {
-    clearInterval(videoSync.followerTimer);
-    videoSync.followerTimer = null;
-  }
-  
-  if (masterSystem.iAmMaster) {
-    // Enhanced Master Timer
-    videoSync.updateTimer = setInterval(enhancedMasterBroadcast, enhancedVideoSync.masterBroadcastInterval);
-  } else {
-    // Enhanced Follower Timer  
-    videoSync.followerTimer = setInterval(async () => {
-      if (!videoSync.active || masterSystem.iAmMaster) return;
-      
-      try {
-        const videoState = await getVideoState();
-        if (videoState.success) {
-          const followerData = {
-            currentTime: Number(videoState.currentTime.toFixed(3)),
-            paused: Boolean(videoState.paused),
-            url: videoState.videoUrl || window.location.href,
-            timestamp: Date.now(),
-            isMaster: false,
-            nickname: appState.currentUser,
-            playbackRate: videoState.playbackRate || 1,
-            duration: videoState.duration || 0,
-            networkQuality: enhancedVideoSync.networkStatus.connectionQuality,
-            syncStatus: videoSync.syncing ? 'syncing' : 'ready'
-          };
-          
-          await videoSync.myRef.set(followerData);
-        }
-      } catch (error) {
-        console.error("Enhanced follower report error:", error);
-      }
-    }, enhancedVideoSync.followerReportInterval);
-  }
-  
-  console.log(`🔄 Enhanced timers started - Role: ${masterSystem.iAmMaster ? 'Master 👑' : 'Follower 👤'}`);
-}
-
-// ================== 7. ENHANCED STATE CHANGE HANDLER ==================
-
-function enhancedHandleVideoStateChange(snapshot) {
+function handleVideoStateChange(snapshot) {
   if (!snapshot.exists()) return;
   
   try {
     const states = snapshot.val();
     
     if (masterSystem.iAmMaster) {
-      // Master: Kendi durumunu göster
+      // *** MASTER: Sadece kendi durumunu göster ***
       const myState = states[appState.currentUser];
-      if (myState && validateVideoState(myState, 'master_self').valid) {
+      
+      if (myState && validateStateObject(myState, 'master_self')) {
         updateVideoTimes(myState.currentTime, 0);
       }
-      return;
+      return; // Master hiçbir zaman sync yapmaz!
     }
     
-    // Follower: Enhanced sync
+    // *** FOLLOWER: Master'a sync yap ***
     const masterState = findMasterState(states);
     const myState = states[appState.currentUser];
     
-    if (!masterState || !myState) {
-      updateVideoTimes(myState?.currentTime || 0, masterState?.currentTime || 0);
+    if (!masterState) {
+      console.log("⚠️ No valid master state found");
+      updateVideoTimes(myState?.currentTime || 0, 0);
+      return;
+    }
+    
+    if (!myState || !validateStateObject(myState, 'follower_self')) {
+      console.log("⚠️ No valid follower state found");
+      updateVideoTimes(0, masterState.currentTime);
       return;
     }
     
     // UI güncelle
     updateVideoTimes(myState.currentTime, masterState.currentTime);
     
-    // Enhanced sync
-    enhancedFollowerSync(masterState, myState);
+    // Sync işlemi
+    performVideoSync(masterState, myState);
     
   } catch (error) {
-    console.error("Enhanced state change error:", error);
+    console.error("Video state change error:", error);
+  }
+}
+  
+  // ================== SYNC İŞLEMİ - BASIT VE GÜVENLİ ==================
+
+async function performVideoSync(masterState, myState) {
+  const now = Date.now();
+  
+  // *** DÖNGÜ ÖNLEYİCİ KONTROLLER ***
+  
+  // 1. Zaten sync yapılıyor mu?
+  if (videoSync.syncing) {
+    return;
+  }
+  
+  // 2. Cooldown kontrolü
+  if (now - videoSync.lastSyncTime < videoSync.syncCooldown) {
+    return;
+  }
+  
+  // 3. State yaşı kontrolü
+  const masterAge = now - masterState.timestamp;
+  const myAge = now - myState.timestamp;
+  
+  if (masterAge > 10000 || myAge > 10000) {
+    console.log("⚠️ Stale state detected, skipping sync");
+    return;
+  }
+  
+  // *** FARK HESAPLAMA ***
+  const timeDiff = Math.abs(myState.currentTime - masterState.currentTime);
+  const pauseStateDiff = myState.paused !== masterState.paused;
+  
+  // Küçük farklar için sync yapma
+  if (timeDiff < videoSync.maxSyncDifference && !pauseStateDiff) {
+    updateSyncStatus(`✅ Synced - ${timeDiff.toFixed(1)}s diff`);
+    return;
+  }
+  
+  // *** SYNC İŞLEMİNİ GERÇEKLEŞTİR ***
+  console.log("🔄 Performing sync:", {
+    masterTime: masterState.currentTime.toFixed(2),
+    myTime: myState.currentTime.toFixed(2),
+    timeDiff: timeDiff.toFixed(2),
+    pauseStateDiff
+  });
+  
+  videoSync.syncing = true;
+  videoSync.lastSyncTime = now;
+  
+  try {
+    updateSyncStatus("🔄 Synchronizing...");
+    
+    let syncSuccess = false;
+    
+    // 1. Pause/Play state sync (önce bu)
+    if (pauseStateDiff) {
+      if (masterState.paused && !myState.paused) {
+        console.log("⏸️ Syncing to pause");
+        await executeVideoAction('pauseVideo');
+        await sleep(300);
+      } else if (!masterState.paused && myState.paused) {
+        console.log("▶️ Syncing to play");
+        await executeVideoAction('playVideo');
+        await sleep(300);
+      }
+    }
+    
+        // 2. Time sync (sonra bu)
+    if (timeDiff > videoSync.maxSyncDifference) {
+      console.log(`⏭️ Syncing time: ${myState.currentTime.toFixed(2)}s → ${masterState.currentTime.toFixed(2)}s`);
+      
+      // *** YENİ: Network compensation ***
+      let targetTime = masterState.currentTime;
+      const masterAge = now - masterState.timestamp;
+      if (!masterState.paused && masterAge > 1000) {
+        const compensationSeconds = masterAge / 1000;
+        targetTime += Math.min(compensationSeconds, 2); // Max 2 saniye kompensasyon
+        console.log(`🔧 Network compensation: +${compensationSeconds.toFixed(1)}s`);
+      }
+      
+      const timeSuccess = await executeVideoAction('setVideoTime', targetTime);
+      syncSuccess = timeSuccess;
+      
+      if (timeSuccess) {
+        // Sync sonrası play state kontrolü
+        if (!masterState.paused) {
+          setTimeout(async () => {
+            const currentState = await getVideoState();
+            if (currentState.success && currentState.paused) {
+              console.log("🔄 Restarting video after time sync");
+              await executeVideoAction('playVideo');
+            }
+          }, 800);
+        }
+      }
+    } else {
+      syncSuccess = true;
+    }
+    
+    // Sonuç
+    if (syncSuccess) {
+      updateSyncStatus(`✅ Sync successful`);
+      videoSync.consecutiveSyncs = 0;
+    } else {
+      updateSyncStatus(`❌ Sync failed`);
+      videoSync.consecutiveSyncs++;
+    }
+    
+  } catch (error) {
+    console.error("Sync error:", error);
+    updateSyncStatus("❌ Sync error");
+    videoSync.consecutiveSyncs++;
+  } finally {
+    // Her zaman syncing flag'ini temizle
+    setTimeout(() => {
+      videoSync.syncing = false;
+    }, 1500);
   }
 }
 
-// ================== 8. SİSTEM DİAGNOSTİCS ==================
+async function getVideoState() {
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.runtime) {
+      resolve({ success: false, error: "Chrome runtime not available" });
+      return;
+    }
+    
+    chrome.runtime.sendMessage({ action: "getVideoInfo" }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        resolve(response || { success: false });
+      }
+    });
+  });
+}
 
-function getEnhancedDiagnostics() {
-  return {
-    timestamp: Date.now(),
-    version: 'enhanced-v5.1',
+async function executeVideoAction(action, value = null) {
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.runtime) {
+      resolve(false);
+      return;
+    }
     
-    networkStatus: enhancedVideoSync.networkStatus,
-    adaptiveSync: enhancedVideoSync.adaptiveSync,
-    errorTracking: enhancedVideoSync.errorTracking,
+    const message = { action };
+    if (value !== null) message.currentTime = value;
     
-    lastMasterState: enhancedVideoSync.lastMasterState ? {
-      time: enhancedVideoSync.lastMasterState.currentTime,
-      paused: enhancedVideoSync.lastMasterState.paused,
-      age: Date.now() - enhancedVideoSync.lastMasterState.timestamp
-    } : null,
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error(`Video action ${action} error:`, chrome.runtime.lastError);
+        resolve(false);
+      } else {
+        resolve(response?.success || false);
+      }
+    });
+  });
+}
+
+function stopVideoSync() {
+  if (videoSync.active) {
+    videoSync.active = false;
     
-    syncStatus: {
-      syncing: videoSync.syncing,
-      lastSyncTime: videoSync.lastSyncTime,
-      adaptiveThreshold: calculateAdaptiveSyncThreshold(),
-      adaptiveCooldown: calculateAdaptiveCooldown()
+    // Tek timer sistemini durdur
+    stopVideoSyncTimer();
+    
+    if (videoSync.listener && videoSync.roomRef) {
+      videoSync.roomRef.off('value', videoSync.listener);
+      videoSync.listener = null;
+    }
+    
+    if (videoSync.myRef) {
+      videoSync.myRef.remove();
+    }
+    
+    videoSync.lastState = null;
+    videoSync.syncing = false;
+    videoSync.lastSyncTime = 0;
+    videoSync.consecutiveSyncs = 0;
+    videoSync.role = null;
+    
+    updateSyncStatus("⏸️ Video sync stopped");
+    updateVideoTimes(0, 0);
+    
+    console.log("🛑 Video sync stopped completely");
+  }
+}
+
+// ================== ROOM MANAGEMENT ==================
+
+function initRoomManagement() {
+  // Create video code
+  if (elements.createVideoChatCodeBtn) {
+    elements.createVideoChatCodeBtn.addEventListener("click", async () => {
+      const code = generateCode();
+      try {
+        await appState.database.ref(`videoRooms/${code}`).set({
+          createdBy: appState.currentUser,
+          createdAt: Date.now()
+        });
+        
+        if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = code;
+        if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.remove("hidden");
+        showMessage("Video room code created: " + code);
+      } catch (error) {
+        showMessage("Code creation error!", true);
+      }
+    });
+  }
+  
+  // Create chat code
+  if (elements.createChatCodeBtn) {
+    elements.createChatCodeBtn.addEventListener("click", async () => {
+      const code = generateCode();
+      try {
+        await appState.database.ref(`chatRooms/${code}`).set({
+          createdBy: appState.currentUser,
+          createdAt: Date.now()
+        });
+        
+        if (elements.generatedChatCode) elements.generatedChatCode.textContent = code;
+        if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.remove("hidden");
+        showMessage("Chat room code created: " + code);
+      } catch (error) {
+        showMessage("Code creation error!", true);
+      }
+    });
+  }
+  
+  // Copy codes
+  if (elements.copyVideoCodeBtn) {
+    elements.copyVideoCodeBtn.addEventListener("click", () => {
+      const code = elements.generatedVideoCode?.textContent;
+      if (code && code !== "-") {
+        copyToClipboard(code, "Video code copied!");
+      }
+    });
+  }
+  
+  if (elements.copyChatCodeBtn) {
+    elements.copyChatCodeBtn.addEventListener("click", () => {
+      const code = elements.generatedChatCode?.textContent;
+      if (code && code !== "-") {
+        copyToClipboard(code, "Chat code copied!");
+      }
+    });
+  }
+  
+  // Join video room
+  if (elements.joinVideoRoomBtn) {
+    elements.joinVideoRoomBtn.addEventListener("click", async () => {
+      const code = elements.videoCodeInput?.value?.trim();
+      if (!code) {
+        showMessage("Please enter a video room code!", true);
+        return;
+      }
+      
+      try {
+        const snapshot = await appState.database.ref(`videoRooms/${code}`).once('value');
+        if (snapshot.exists()) {
+          appState.currentVideoRoom = code;
+          if (elements.currentVideoCode) elements.currentVideoCode.textContent = code;
+          if (elements.videoContainer) elements.videoContainer.classList.remove("hidden");
+          
+          // Switch to video tab
+          const videoTab = document.querySelector('.nav-tab[data-tab="video"]');
+          if (videoTab) videoTab.click();
+          
+          // Start systems
+          await startMasterFollowerSystem(code);
+          await startVideoSync(code);
+          
+          showMessage("Joined video room!");
+        } else {
+          showMessage("Invalid video room code!", true);
+        }
+      } catch (error) {
+        showMessage("Room join error!", true);
+      }
+    });
+  }
+  
+  // Join chat room
+  if (elements.joinChatRoomBtn) {
+    elements.joinChatRoomBtn.addEventListener("click", async () => {
+      const code = elements.chatCodeInput?.value?.trim();
+      if (!code) {
+        showMessage("Please enter a chat room code!", true);
+        return;
+      }
+      
+      try {
+        const snapshot = await appState.database.ref(`chatRooms/${code}`).once('value');
+        if (snapshot.exists()) {
+          appState.currentChatRoom = code;
+          if (elements.currentChatCode) elements.currentChatCode.textContent = code;
+          if (elements.chatContainer) elements.chatContainer.classList.remove("hidden");
+          
+          // Switch to chat tab
+          const chatTab = document.querySelector('.nav-tab[data-tab="chat"]');
+          if (chatTab) chatTab.click();
+          
+          startChatSystem(code);
+          showMessage("Joined chat room!");
+        } else {
+          showMessage("Invalid chat room code!", true);
+        }
+      } catch (error) {
+        showMessage("Chat join error!", true);
+      }
+    });
+  }
+  
+  // Close rooms
+  if (elements.closeVideoChat) {
+    elements.closeVideoChat.addEventListener("click", () => {
+      stopVideoSync();
+      stopMasterFollowerSystem();
+      stopWebRTC();
+      
+      appState.currentVideoRoom = "";
+      if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
+      if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
+      if (elements.videoCodeInput) elements.videoCodeInput.value = "";
+      
+      // Return to rooms tab
+      const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
+      if (roomsTab) roomsTab.click();
+      
+      showMessage("Video room closed.");
+    });
+  }
+  
+  if (elements.closeChatRoom) {
+    elements.closeChatRoom.addEventListener("click", () => {
+      stopChatSystem();
+      
+      appState.currentChatRoom = "";
+      if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
+      if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
+      if (elements.chatCodeInput) elements.chatCodeInput.value = "";
+      
+      // Return to rooms tab
+      const roomsTab = document.querySelector('.nav-tab[data-tab="rooms"]');
+      if (roomsTab) roomsTab.click();
+      
+      showMessage("Chat room closed.");
+    });
+  }
+  
+  console.log("🏠 Room management initialized");
+}
+
+function copyToClipboard(text, successMessage) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      showMessage(successMessage);
+    }).catch(() => {
+      fallbackCopyToClipboard(text, successMessage);
+    });
+  } else {
+    fallbackCopyToClipboard(text, successMessage);
+  }
+}
+
+function fallbackCopyToClipboard(text, successMessage) {
+  const tempInput = document.createElement("input");
+  tempInput.value = text;
+  document.body.appendChild(tempInput);
+  tempInput.select();
+  document.execCommand("copy");
+  document.body.removeChild(tempInput);
+  showMessage(successMessage);
+}
+
+// ================== MASTER TOGGLE ==================
+
+function initMasterToggle() {
+  if (elements.masterToggleBtn) {
+    elements.masterToggleBtn.addEventListener("click", async () => {
+      if (!masterSystem.active) {
+        showMessage("Master system not active!", true);
+        return;
+      }
+      
+      try {
+        const usersSnapshot = await masterSystem.usersRef.once('value');
+        const users = usersSnapshot.val() || {};
+        const onlineUsers = Object.keys(users).filter(user => users[user].online);
+        
+        if (onlineUsers.length < 2) {
+          showMessage("At least 2 users required!", true);
+          return;
+        }
+        
+        const currentIndex = onlineUsers.indexOf(masterSystem.currentMaster);
+        const nextIndex = (currentIndex + 1) % onlineUsers.length;
+        const nextMaster = onlineUsers[nextIndex];
+        
+        await setMaster(nextMaster);
+        showMessage(`Master changed to: ${nextMaster}`);
+      } catch (error) {
+        console.error("Master switching error:", error);
+        showMessage("Master switching error!", true);
+      }
+    });
+  }
+}
+
+// ================== CHAT SYSTEM ==================
+
+function startChatSystem(roomId) {
+  console.log("💬 Starting chat system...");
+  
+  try {
+    chatSystem.active = true;
+    chatSystem.messagesRef = appState.database.ref(`chatMessages/${roomId}`);
+    
+    chatSystem.listener = chatSystem.messagesRef.on("value", (snapshot) => {
+      if (elements.messagesContainer) {
+        elements.messagesContainer.innerHTML = "";
+        
+        if (snapshot.exists()) {
+          const messages = snapshot.val();
+          Object.entries(messages)
+            .sort(([,a], [,b]) => a.timestamp - b.timestamp)
+            .forEach(([key, message]) => displayMessage(message));
+          
+          scrollToBottom();
+        }
+      }
+    });
+    
+    setupMessageSending();
+    
+    console.log("✅ Chat system started");
+    
+  } catch (error) {
+    console.error("❌ Chat startup error:", error);
+    showMessage("Chat system error!", true);
+  }
+}
+
+function setupMessageSending() {
+  if (elements.sendMessageBtn) {
+    elements.sendMessageBtn.onclick = sendMessage;
+  }
+  
+  if (elements.messageInput) {
+    elements.messageInput.onkeypress = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+  }
+}
+
+async function sendMessage() {
+  const message = elements.messageInput?.value?.trim();
+  if (!message || !chatSystem.active) return;
+  
+  try {
+    await chatSystem.messagesRef.push({
+      sender: appState.currentUser,
+      text: message,
+      timestamp: Date.now()
+    });
+    
+    if (elements.messageInput) elements.messageInput.value = "";
+    
+  } catch (error) {
+    console.error("Message sending error:", error);
+    showMessage("Message sending error!", true);
+  }
+}
+
+function displayMessage(message) {
+  if (!elements.messagesContainer) return;
+  
+  const messageEl = document.createElement("div");
+  messageEl.textContent = `${message.sender}: ${message.text}`;
+  messageEl.className = message.sender === appState.currentUser ? "sent-message" : "received-message";
+  
+  const colors = ["#8b5cf6", "#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
+  const colorIndex = message.sender.charCodeAt(0) % colors.length;
+  messageEl.style.backgroundColor = colors[colorIndex];
+  
+  elements.messagesContainer.appendChild(messageEl);
+}
+
+function scrollToBottom() {
+  if (elements.messagesContainer) {
+    elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+  }
+}
+
+function stopChatSystem() {
+  if (chatSystem.active) {
+    chatSystem.active = false;
+    
+    if (chatSystem.listener && chatSystem.messagesRef) {
+      chatSystem.messagesRef.off("value", chatSystem.listener);
+      chatSystem.listener = null;
+    }
+    
+    if (elements.messagesContainer) {
+      elements.messagesContainer.innerHTML = "";
+    }
+    
+    console.log("🛑 Chat system stopped");
+  }
+}
+
+// ================== WEBRTC VIDEO CHAT ==================
+
+function initWebRTC() {
+  if (!elements.startButton || !elements.hangupButton) return;
+  
+  // Start button
+  elements.startButton.onclick = async () => {
+    try {
+      updateVideoStatus("Starting camera...");
+      
+      webrtcSystem.localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      
+      if (elements.localVideo) {
+        elements.localVideo.srcObject = webrtcSystem.localStream;
+        elements.localVideo.style.transform = "scaleX(-1)";
+      }
+      
+      elements.startButton.disabled = true;
+      elements.hangupButton.disabled = false;
+      
+      updateVideoStatus("Call started");
+      updateMediaButtons();
+      
+      if (appState.currentVideoRoom) {
+        await setupWebRTCSignaling(appState.currentVideoRoom);
+      }
+      
+    } catch (error) {
+      console.error("Camera startup error:", error);
+      updateVideoStatus("Camera/microphone access error: " + error.message);
+      elements.startButton.disabled = false;
     }
   };
-}
-
-// ================== 9. EMERGENCY RECOVERY ==================
-
-function emergencyRecovery() {
-  console.log("🚨 Enhanced emergency recovery...");
   
-  // State'leri sıfırla
-  videoSync.syncing = false;
-  videoSync.lastSyncTime = 0;
+  // Hangup button
+  elements.hangupButton.onclick = () => {
+    stopWebRTC();
+  };
   
-  // Enhanced tracking sıfırla
-  enhancedVideoSync.errorTracking.consecutiveErrors = 0;
-  enhancedVideoSync.adaptiveSync.successiveFailures = 0;
-  enhancedVideoSync.adaptiveSync.lastSuccessTime = Date.now();
-  
-  // Network durumunu güncelle
-  updateNetworkStatus();
-  
-  // Timer'ları yeniden başlat
-  startEnhancedTimers();
-  
-  updateSyncStatus("🔄 Enhanced recovery completed");
-  console.log("✅ Enhanced emergency recovery completed");
-}
-
-// ================== 10. İNİTİALİZATION ==================
-
-function initializeEnhancedVideoSync() {
-  console.log("🚀 Initializing Enhanced Video Sync System...");
-  
-  // Network monitoring başlat
-  setTimeout(updateNetworkStatus, 2000);
-  setInterval(updateNetworkStatus, 15000);
-  
-  // Orijinal fonksiyonları sakla
-  if (typeof startRoleBasedTimers !== 'undefined') {
-    window.originalStartRoleBasedTimers = startRoleBasedTimers;
-  }
-  if (typeof handleVideoStateChange !== 'undefined') {
-    window.originalHandleVideoStateChange = handleVideoStateChange;
-  }
-  
-  // Enhanced fonksiyonları global yap
-  window.startRoleBasedTimers = startEnhancedTimers;
-  window.handleVideoStateChange = enhancedHandleVideoStateChange;
-  
-  // Global API'yi genişlet
-  if (window.videoSyncApp) {
-    window.videoSyncApp.enhanced = {
-      diagnostics: getEnhancedDiagnostics,
-      emergencyRecovery: emergencyRecovery,
-      updateNetworkStatus: updateNetworkStatus,
-      
-      setAdaptiveSync: (enabled) => {
-        enhancedVideoSync.adaptiveSync.enabled = enabled;
-        console.log(`Enhanced adaptive sync: ${enabled ? 'enabled' : 'disabled'}`);
-      },
-      
-      resetSettings: () => {
-        enhancedVideoSync.adaptiveSync.successiveFailures = 0;
-        enhancedVideoSync.errorTracking.consecutiveErrors = 0;
-        console.log("Enhanced settings reset");
+  // Camera toggle
+  if (elements.cameraToggle) {
+    elements.cameraToggle.onclick = () => {
+      if (webrtcSystem.localStream) {
+        const videoTrack = webrtcSystem.localStream.getVideoTracks()[0];
+        if (videoTrack) {
+          webrtcSystem.isCameraOn = !webrtcSystem.isCameraOn;
+          videoTrack.enabled = webrtcSystem.isCameraOn;
+          updateMediaButtons();
+          updateVideoStatus(webrtcSystem.isCameraOn ? "Camera on" : "Camera off");
+        }
       }
     };
   }
   
-  console.log("✅ Enhanced Video Sync System initialized");
-  console.log("🔧 Enhanced features active:");
-  console.log("  ✅ Adaptive sync thresholds");
-  console.log("  ✅ Network quality monitoring");
-  console.log("  ✅ Enhanced error recovery");
-  console.log("  ✅ State validation system");
+  // Microphone toggle
+  if (elements.micToggle) {
+    elements.micToggle.onclick = () => {
+      if (webrtcSystem.localStream) {
+        const audioTrack = webrtcSystem.localStream.getAudioTracks()[0];
+        if (audioTrack) {
+          webrtcSystem.isMicOn = !webrtcSystem.isMicOn;
+          audioTrack.enabled = webrtcSystem.isMicOn;
+          updateMediaButtons();
+          updateVideoStatus(webrtcSystem.isMicOn ? "Microphone on" : "Microphone off");
+        }
+      }
+    };
+  }
+  
+  console.log("📹 WebRTC initialized");
 }
 
-// ================== AUTO-START ==================
-
-// Enhanced sistem otomatik başlatma
-if (typeof window !== 'undefined') {
-  // App hazır olduğunda enhanced sistemi başlat
-  const startEnhanced = () => {
-    if (window.videoSyncApp && window.videoSyncApp.appState && window.videoSyncApp.appState.initialized) {
-      initializeEnhancedVideoSync();
-      
-      console.log("🎯 ENHANCED VIDEO SYNC SYSTEM READY!");
-      console.log("📊 Diagnostics: window.videoSyncApp.enhanced.diagnostics()");
-      console.log("🚨 Emergency: window.videoSyncApp.enhanced.emergencyRecovery()");
-      
+async function setupWebRTCSignaling(roomId) {
+  try {
+    webrtcSystem.roomRef = appState.database.ref(`webrtcRooms/${roomId}`);
+    
+    const roomSnapshot = await webrtcSystem.roomRef.once('value');
+    
+    if (!roomSnapshot.exists()) {
+      await createWebRTCRoom();
     } else {
-      // Henüz hazır değilse 2 saniye sonra tekrar dene
-      setTimeout(startEnhanced, 2000);
+      await joinWebRTCRoom();
+    }
+    
+  } catch (error) {
+    console.error("WebRTC signaling error:", error);
+    updateVideoStatus("Connection error: " + error.message);
+  }
+}
+
+async function createWebRTCRoom() {
+  try {
+    updateVideoStatus("Creating room...");
+    
+    webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
+    setupPeerConnectionEvents();
+    
+    if (webrtcSystem.localStream) {
+      webrtcSystem.localStream.getTracks().forEach(track => {
+        webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
+      });
+    }
+    
+    collectICECandidates('caller', 'callee');
+    
+    const offer = await webrtcSystem.peerConnection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
+    });
+    await webrtcSystem.peerConnection.setLocalDescription(offer);
+    
+    await webrtcSystem.roomRef.set({
+      offer: {
+        type: offer.type,
+        sdp: offer.sdp
+      },
+      created: Date.now()
+    });
+    
+    webrtcSystem.roomRef.on('value', async (snapshot) => {
+      const data = snapshot.val();
+      if (data?.answer && webrtcSystem.peerConnection.signalingState === 'have-local-offer') {
+        try {
+          const answer = new RTCSessionDescription(data.answer);
+          await webrtcSystem.peerConnection.setRemoteDescription(answer);
+          updateVideoStatus("Answer received, connecting...");
+        } catch (error) {
+          console.error("Answer processing error:", error);
+          updateVideoStatus("Connection error");
+        }
+      }
+    });
+    
+    updateVideoStatus("Waiting for participant...");
+    
+  } catch (error) {
+    console.error("Room creation error:", error);
+    updateVideoStatus("Room creation error: " + error.message);
+  }
+}
+
+async function joinWebRTCRoom() {
+  try {
+    updateVideoStatus("Joining room...");
+    
+    const roomSnapshot = await webrtcSystem.roomRef.once('value');
+    const roomData = roomSnapshot.val();
+    
+    if (!roomData?.offer) {
+      updateVideoStatus("Invalid room");
+      return;
+    }
+    
+    webrtcSystem.peerConnection = new RTCPeerConnection(webrtcSystem.servers);
+    setupPeerConnectionEvents();
+    
+    if (webrtcSystem.localStream) {
+      webrtcSystem.localStream.getTracks().forEach(track => {
+        webrtcSystem.peerConnection.addTrack(track, webrtcSystem.localStream);
+      });
+    }
+    
+    collectICECandidates('callee', 'caller');
+    
+    const offer = new RTCSessionDescription(roomData.offer);
+    await webrtcSystem.peerConnection.setRemoteDescription(offer);
+    
+    const answer = await webrtcSystem.peerConnection.createAnswer();
+    await webrtcSystem.peerConnection.setLocalDescription(answer);
+    
+    await webrtcSystem.roomRef.update({
+      answer: {
+        type: answer.type,
+        sdp: answer.sdp
+      }
+    });
+    
+    updateVideoStatus("Connecting...");
+    
+  } catch (error) {
+    console.error("Room join error:", error);
+    updateVideoStatus("Room join error: " + error.message);
+  }
+}
+
+function setupPeerConnectionEvents() {
+  if (!webrtcSystem.peerConnection) return;
+  
+  webrtcSystem.remoteStream = new MediaStream();
+  if (elements.remoteVideo) {
+    elements.remoteVideo.srcObject = webrtcSystem.remoteStream;
+    elements.remoteVideo.style.transform = "scaleX(-1)";
+  }
+  
+  webrtcSystem.peerConnection.ontrack = (event) => {
+    console.log("Remote track received");
+    event.streams[0].getTracks().forEach(track => {
+      webrtcSystem.remoteStream.addTrack(track);
+    });
+  };
+  
+  webrtcSystem.peerConnection.onconnectionstatechange = () => {
+    const state = webrtcSystem.peerConnection.connectionState;
+    console.log("Connection state:", state);
+    
+    switch (state) {
+      case 'connected':
+        updateVideoStatus("Connected! Call is active.");
+        break;
+      case 'disconnected':
+        updateVideoStatus("Connection lost");
+        break;
+      case 'failed':
+        updateVideoStatus("Connection failed");
+        break;
+    }
+  };
+}
+
+function collectICECandidates(localName, remoteName) {
+  const localCandidatesRef = webrtcSystem.roomRef.child(`${localName}Candidates`);
+  const remoteCandidatesRef = webrtcSystem.roomRef.child(`${remoteName}Candidates`);
+  
+  webrtcSystem.peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      console.log(`📡 ${localName} ICE candidate sending`);
+      localCandidatesRef.push(event.candidate.toJSON()).catch(error => {
+        console.error("ICE candidate sending error:", error);
+      });
     }
   };
   
-  // 3 saniye sonra başlat (ana app'in initialize olması için)
-  setTimeout(startEnhanced, 3000);
+  remoteCandidatesRef.on('child_added', async (snapshot) => {
+    const candidateData = snapshot.val();
+    console.log(`📡 ${remoteName} ICE candidate received`);
+    
+    try {
+      const candidate = new RTCIceCandidate(candidateData);
+      await webrtcSystem.peerConnection.addIceCandidate(candidate);
+      console.log(`✅ ${remoteName} ICE candidate added`);
+    } catch (error) {
+      console.error(`❌ ${remoteName} ICE candidate add error:`, error);
+    }
+  });
 }
 
-console.log("🔧 Enhanced Video Sync System loaded and waiting for app initialization...");
+function updateMediaButtons() {
+  if (elements.cameraToggle) {
+    const cameraOn = elements.cameraToggle.querySelector('.camera-on');
+    const cameraOff = elements.cameraToggle.querySelector('.camera-off');
+    
+    if (cameraOn && cameraOff) {
+      if (webrtcSystem.isCameraOn) {
+        cameraOn.classList.remove('hidden');
+        cameraOff.classList.add('hidden');
+        elements.cameraToggle.classList.add('active');
+        elements.cameraToggle.classList.remove('inactive');
+      } else {
+        cameraOn.classList.add('hidden');
+        cameraOff.classList.remove('hidden');
+        elements.cameraToggle.classList.remove('active');
+        elements.cameraToggle.classList.add('inactive');
+      }
+    }
+  }
+  
+  if (elements.micToggle) {
+    const micOn = elements.micToggle.querySelector('.mic-on');
+    const micOff = elements.micToggle.querySelector('.mic-off');
+    
+    if (micOn && micOff) {
+      if (webrtcSystem.isMicOn) {
+        micOn.classList.remove('hidden');
+        micOff.classList.add('hidden');
+        elements.micToggle.classList.add('active');
+        elements.micToggle.classList.remove('inactive');
+      } else {
+        micOn.classList.add('hidden');
+        micOff.classList.remove('hidden');
+        elements.micToggle.classList.remove('active');
+        elements.micToggle.classList.add('inactive');
+      }
+    }
+  }
+}
+
+function updateVideoStatus(message) {
+  if (elements.videoStatus) {
+    elements.videoStatus.textContent = message;
+  }
+  console.log("📹", message);
+}
+
+function stopWebRTC() {
+  if (webrtcSystem.localStream) {
+    webrtcSystem.localStream.getTracks().forEach(track => track.stop());
+    webrtcSystem.localStream = null;
+  }
+  
+  if (webrtcSystem.remoteStream) {
+    webrtcSystem.remoteStream.getTracks().forEach(track => track.stop());
+    webrtcSystem.remoteStream = null;
+  }
+  
+  if (webrtcSystem.peerConnection) {
+    webrtcSystem.peerConnection.close();
+    webrtcSystem.peerConnection = null;
+  }
+  
+  if (webrtcSystem.roomRef) {
+    webrtcSystem.roomRef.off();
+    webrtcSystem.roomRef = null;
+  }
+  
+  if (elements.localVideo) elements.localVideo.srcObject = null;
+  if (elements.remoteVideo) elements.remoteVideo.srcObject = null;
+  
+  if (elements.startButton) elements.startButton.disabled = false;
+  if (elements.hangupButton) elements.hangupButton.disabled = true;
+  
+  webrtcSystem.isCameraOn = true;
+  webrtcSystem.isMicOn = true;
+  
+  updateVideoStatus("Call ended");
+  console.log("🛑 WebRTC stopped");
+}
+
+// ================== CLEANUP FUNCTIONS ==================
+
+function cleanup() {
+  console.log("🧹 Cleaning up...");
+  
+  stopVideoSync();
+  stopMasterFollowerSystem();
+  stopChatSystem();
+  stopWebRTC();
+  
+  appState.currentVideoRoom = "";
+  appState.currentChatRoom = "";
+  
+  resetUI();
+  
+  console.log("✅ Cleanup completed");
+}
+
+function resetUI() {
+  if (elements.currentVideoCode) elements.currentVideoCode.textContent = "---";
+  if (elements.currentChatCode) elements.currentChatCode.textContent = "---";
+  if (elements.videoCodeInput) elements.videoCodeInput.value = "";
+  if (elements.chatCodeInput) elements.chatCodeInput.value = "";
+  
+  if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
+  if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
+  if (elements.videoCodeDisplay) elements.videoCodeDisplay.classList.add("hidden");
+  if (elements.chatCodeDisplay) elements.chatCodeDisplay.classList.add("hidden");
+  
+  updateSyncStatus("⏸️ Synchronization off");
+  updateVideoTimes(0, 0);
+  
+  if (elements.masterStatus) elements.masterStatus.textContent = "---";
+  if (elements.currentMaster) elements.currentMaster.textContent = "---";
+  if (elements.videoStatus) elements.videoStatus.textContent = "Click to start call";
+  
+  if (elements.generatedVideoCode) elements.generatedVideoCode.textContent = "-";
+  if (elements.generatedChatCode) elements.generatedChatCode.textContent = "-";
+}
+
+// ================== STARTUP SYSTEM ==================
+
+function initApp() {
+  console.log("🚀 Fixed Video Sync App v6 starting...");
+  
+  try {
+    if (!initFirebase()) {
+      throw new Error("Firebase could not be initialized");
+    }
+    
+    setupPasswordValidation();
+    initTabNavigation();
+    initAuth();
+    initRoomManagement();
+    initMasterToggle();
+    initWebRTC();
+    
+    setInitialUIState();
+    setupGlobalEventListeners();
+    
+    appState.initialized = true;
+    console.log("✅ Fixed app successfully started");
+    showMessage("Fixed Video Sync App v6 ready!");
+    
+  } catch (error) {
+    console.error("❌ App startup error:", error);
+    showMessage("Application startup error: " + error.message, true);
+  }
+}
+
+function setInitialUIState() {
+  if (elements.loginScreen) elements.loginScreen.classList.remove("hidden");
+  if (elements.signupScreen) elements.signupScreen.classList.add("hidden");
+  if (elements.appContainer) elements.appContainer.classList.add("hidden");
+  
+  if (elements.videoContainer) elements.videoContainer.classList.add("hidden");
+  if (elements.chatContainer) elements.chatContainer.classList.add("hidden");
+  
+  if (elements.roomsSection) elements.roomsSection.classList.remove("hidden");
+  
+  const firstTab = document.querySelector('.nav-tab[data-tab="rooms"]');
+  if (firstTab) firstTab.classList.add('active');
+  
+  resetUI();
+  
+  console.log("🎨 Initial UI state set");
+}
+
+function setupGlobalEventListeners() {
+  window.addEventListener('error', (event) => {
+    console.error("🚨 Global error:", event.error);
+    showMessage("System error occurred!", true);
+  });
+  
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error("🚨 Promise rejection:", event.reason);
+    showMessage("Connection error!", true);
+  });
+  
+  window.addEventListener('beforeunload', () => {
+    console.log("📄 Page closing, cleaning up...");
+    cleanup();
+  });
+  
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      console.log("👁️ Tab hidden");
+    } else {
+      console.log("👁️ Tab visible");
+      if (masterSystem.active && masterSystem.usersRef) {
+        masterSystem.usersRef.child(appState.currentUser).update({
+          lastSeen: Date.now(),
+          online: true
+        });
+      }
+    }
+  });
+  
+  console.log("🔧 Global event listeners set up");
+}
+
+// ================== EMERGENCY RECOVERY SYSTEM ==================
+
+function emergencyRecovery() {
+  console.log("🚨 Emergency recovery starting...");
+  
+  try {
+    // 1. Stop all timers aggressively
+    stopVideoSyncTimer();
+    
+    if (masterSystem.heartbeatTimer) {
+      clearInterval(masterSystem.heartbeatTimer);
+      masterSystem.heartbeatTimer = null;
+    }
+    
+    // Clear any remaining timers
+    for (let i = 1; i < 99999; i++) {
+      try {
+        clearInterval(i);
+        clearTimeout(i);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // 2. Reset all states
+    videoSync.syncing = false;
+    videoSync.lastSyncTime = 0;
+    videoSync.consecutiveSyncs = 0;
+    videoSync.role = null;
+    
+    // 3. Restart systems if active
+    if (videoSync.active && appState.currentVideoRoom) {
+      setTimeout(() => {
+        console.log("🔄 Restarting video sync after emergency recovery...");
+        videoSync.role = masterSystem.iAmMaster ? 'master' : 'follower';
+        startVideoSyncTimer();
+      }, 3000);
+    }
+    
+    if (masterSystem.active) {
+      setTimeout(() => {
+        console.log("🔄 Restarting heartbeat after emergency recovery...");
+        startHeartbeat();
+      }, 2000);
+    }
+    
+    updateSyncStatus("🔧 Emergency recovery completed");
+    showMessage("Emergency recovery completed successfully!");
+    console.log("✅ Emergency recovery completed");
+    
+  } catch (error) {
+    console.error("❌ Emergency recovery failed:", error);
+    showMessage("Emergency recovery failed: " + error.message, true);
+  }
+}
+
+// ================== DEBUG AND MONITORING ==================
+
+function getSystemStatus() {
+  return {
+    timestamp: Date.now(),
+    version: "6.0.0-completely-fixed",
+    appState: {
+      initialized: appState.initialized,
+      currentUser: appState.currentUser,
+      currentVideoRoom: appState.currentVideoRoom,
+      currentChatRoom: appState.currentChatRoom
+    },
+    masterSystem: {
+      active: masterSystem.active,
+      iAmMaster: masterSystem.iAmMaster,
+      currentMaster: masterSystem.currentMaster,
+      heartbeatActive: !!masterSystem.heartbeatTimer
+    },
+    videoSync: {
+      active: videoSync.active,
+      role: videoSync.role,
+      syncing: videoSync.syncing,
+      lastSyncTime: videoSync.lastSyncTime,
+      consecutiveSyncs: videoSync.consecutiveSyncs,
+      timerActive: !!videoSync.activeTimer,
+      syncCooldown: videoSync.syncCooldown,
+      maxSyncDifference: videoSync.maxSyncDifference
+    },
+    chatSystem: {
+      active: chatSystem.active,
+      listenerActive: !!chatSystem.listener
+    },
+    webrtcSystem: {
+      hasLocalStream: !!webrtcSystem.localStream,
+      hasRemoteStream: !!webrtcSystem.remoteStream,
+      connectionState: webrtcSystem.peerConnection?.connectionState || 'none',
+      isCameraOn: webrtcSystem.isCameraOn,
+      isMicOn: webrtcSystem.isMicOn
+    }
+  };
+}
+
+function getSyncDebugInfo() {
+  return {
+    timestamp: Date.now(),
+    videoSyncActive: videoSync.active,
+    masterSystemActive: masterSystem.active,
+    iAmMaster: masterSystem.iAmMaster,
+    currentMaster: masterSystem.currentMaster,
+    currentRole: videoSync.role,
+    syncing: videoSync.syncing,
+    lastSyncTime: videoSync.lastSyncTime,
+    consecutiveSyncs: videoSync.consecutiveSyncs,
+    cooldownRemaining: Math.max(0, videoSync.syncCooldown - (Date.now() - videoSync.lastSyncTime)),
+    timers: {
+      activeTimer: !!videoSync.activeTimer,
+      heartbeatTimer: !!masterSystem.heartbeatTimer
+    },
+    settings: {
+      syncCooldown: videoSync.syncCooldown,
+      maxSyncDifference: videoSync.maxSyncDifference,
+      urgentSyncThreshold: videoSync.urgentSyncThreshold,
+      maxConsecutiveSyncs: videoSync.maxConsecutiveSyncs
+    }
+  };
+}
+
+function resetSyncState() {
+  videoSync.syncing = false;
+  videoSync.lastSyncTime = 0;
+  videoSync.consecutiveSyncs = 0;
+  console.log("🔄 Sync state manually reset");
+  updateSyncStatus("🔄 Sync reset");
+}
+
+// ================== GLOBAL API ==================
+
+window.videoSyncApp = {
+  version: "6.0.0-completely-fixed",
+  appState,
+  masterSystem,
+  videoSync,
+  chatSystem,
+  webrtcSystem,
+  elements,
+  
+  // Core functions
+  cleanup,
+  showMessage,
+  updateSyncStatus,
+  emergencyRecovery,
+  
+  // Debug functions
+  getSyncDebugInfo,
+  resetSyncState,
+  getSystemStatus,
+  
+  // Status function
+  getStatus: getSystemStatus,
+  
+  // Convenience functions
+  resetSync: resetSyncState,
+  debugSync: getSyncDebugInfo,
+  emergency: emergencyRecovery,
+  
+  // Timer control
+  stopTimer: stopVideoSyncTimer,
+  startTimer: startVideoSyncTimer,
+  
+  // Advanced debug
+  getVideoState: getVideoState,
+  executeVideoAction: executeVideoAction,
+  
+  // Emergency functions
+  clearAllTimers: () => {
+    for (let i = 1; i < 99999; i++) {
+      try {
+        clearInterval(i);
+        clearTimeout(i);
+      } catch (e) {}
+    }
+    console.log("🧹 All timers cleared");
+  }
+};
+
+// ================== INITIALIZATION ==================
+
+// Start the app
+initApp();
+
+// ================== FINAL STATUS REPORTING ==================
+
+setTimeout(() => {
+  const status = getSystemStatus();
+  console.log("🎉 FIXED VIDEO SYNC APP v6 FULLY LOADED!");
+  console.log("📊 System Status:", status);
+  console.log("📋 Available debug commands:");
+  console.log("  - window.videoSyncApp.getStatus()");
+  console.log("  - window.videoSyncApp.getSyncDebugInfo()");
+  console.log("  - window.videoSyncApp.resetSyncState()");
+  console.log("  - window.videoSyncApp.emergencyRecovery()");
+  console.log("🔧 Emergency functions:");
+  console.log("  - window.videoSyncApp.cleanup()");
+  console.log("  - window.videoSyncApp.clearAllTimers()");
+  console.log("  - window.videoSyncApp.stopTimer()");
+  console.log("  - window.videoSyncApp.startTimer()");
+  
+  console.log("🎯 MAJOR FIXES APPLIED:");
+  console.log("  ✅ Single timer system (no more conflicts)");
+  console.log("  ✅ Proper role-based cleanup");
+  console.log("  ✅ Extended cooldown periods (5s)");
+  console.log("  ✅ Enhanced error recovery");
+  console.log("  ✅ Removed Enhanced system conflicts");
+  console.log("  ✅ Improved state management");
+  console.log("  ✅ Emergency recovery system");
+  
+}, 2000);
+
+// Final ready message
+setTimeout(() => {
+  console.log("🎯 VIDEO SYNC APP TAMAMEN DÜZELTİLDİ!");
+  console.log(`⏰ Yükleme zamanı: ${new Date().toLocaleString('tr-TR')}`);
+  console.log(`🔢 App versiyon: v6.0.0-completely-fixed`);
+  console.log("🔧 Düzeltilen ana sorunlar:");
+  console.log("  ✅ Çifte timer sistemi kaldırıldı");
+  console.log("  ✅ Enhanced sistem çakışması çözüldü");
+  console.log("  ✅ Role değişim timer cleanup'ı düzeltildi");
+  console.log("  ✅ Sync cooldown 5 saniyeye çıkarıldı");
+  console.log("  ✅ Emergency recovery sistemi eklendi");
+  console.log("  ✅ Tüm state management'lar temizlendi");
+  console.log("🏁 Initialization complete - Ready for stable synchronized video experience!");
+}, 3000);
+
+});
+
+// ================== END OF FILE ==================
