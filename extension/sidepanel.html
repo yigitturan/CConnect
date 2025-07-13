@@ -366,6 +366,35 @@
             </button>
           </div>
           
+          <!-- Shared Note Area -->
+          <div class="shared-note-container">
+            <div class="shared-note-header">
+              <svg class="shared-note-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              </svg>
+              <span class="shared-note-label">Shared Note</span>
+              <button id="clearSharedNote" class="btn-ghost-mini" title="Clear note">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <div class="shared-note-input-wrapper">
+              <input 
+                type="text" 
+                id="sharedNoteInput" 
+                class="shared-note-input" 
+                placeholder="Share a link or note with everyone..." 
+                maxlength="300"
+              />
+              <div class="shared-note-status">
+                <span id="sharedNoteLastUpdated" class="last-updated-text">No content</span>
+              </div>
+            </div>
+          </div>
+          
           <!-- Video Streams -->
           <div class="video-container">
             <div class="video-stream-wrapper">

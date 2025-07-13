@@ -1,5 +1,5 @@
 // ================== TAMAMEN DÜZELTİLMİŞ SIDEPANEL - VIDEO SYNC & CHAT ==================
-// Tüm sorunlar çözülmüş, temiz ve optimize edilmiş versiyon
+// Tüm sorunlar çözülmüş, temiz ve optimize edilmiş versiyon + Shared Note System
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Düzeltilmiş Video Sync App v6 başlatılıyor...");
@@ -41,6 +41,16 @@ document.addEventListener("DOMContentLoaded", () => {
     maxConsecutiveSyncs: 3,     
     urgentSyncThreshold: 6.0,   // 6+ saniye fark için acil sync
     role: null                  // 'master' veya 'follower'
+  };
+  
+  // Shared note system
+  let sharedNoteSystem = {
+    active: false,
+    roomRef: null,
+    listener: null,
+    updateTimer: null,
+    lastContent: "",
+    isUpdating: false
   };
   
   // Chat system
@@ -111,6 +121,11 @@ document.addEventListener("DOMContentLoaded", () => {
     syncStatus: document.getElementById("syncStatus"),
     currentVideoTime: document.getElementById("currentVideoTime"),
     remoteVideoTime: document.getElementById("remoteVideoTime"),
+    
+    // Shared note
+    sharedNoteInput: document.getElementById("sharedNoteInput"),
+    sharedNoteLastUpdated: document.getElementById("sharedNoteLastUpdated"),
+    clearSharedNote: document.getElementById("clearSharedNote"),
     
     // Room management
     createVideoChatCodeBtn: document.getElementById("createVideoChatCodeBtn"),
@@ -472,6 +487,222 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
+  // ================== SHARED NOTE SYSTEM ==================
+  
+  async function startSharedNoteSystem(roomId) {
+    console.log("📝 Starting Shared Note system...");
+    
+    try {
+      sharedNoteSystem.active = true;
+      sharedNoteSystem.roomRef = appState.database.ref(`sharedNotes/${roomId}`);
+      
+      // Listen for changes
+      sharedNoteSystem.listener = sharedNoteSystem.roomRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        updateSharedNoteUI(data);
+      });
+      
+      // Setup input listeners
+      setupSharedNoteInput();
+      
+      console.log("✅ Shared Note system started");
+      
+    } catch (error) {
+      console.error("❌ Shared Note startup error:", error);
+      showMessage("Shared note system error!", true);
+    }
+  }
+  
+  function setupSharedNoteInput() {
+    if (!elements.sharedNoteInput) return;
+    
+    let typingTimer;
+    const typingDelay = 1000; // 1 second delay after typing stops
+    
+    elements.sharedNoteInput.addEventListener('input', () => {
+      const content = elements.sharedNoteInput.value.trim();
+      
+      // Clear existing timer
+      clearTimeout(typingTimer);
+      
+      // Detect if it's a link
+      const isLink = isValidUrl(content);
+      elements.sharedNoteInput.classList.toggle('has-link', isLink);
+      
+      // Set new timer to update after user stops typing
+      typingTimer = setTimeout(async () => {
+        if (!sharedNoteSystem.isUpdating) {
+          await updateSharedNote(content);
+        }
+      }, typingDelay);
+    });
+    
+    // Handle enter key for immediate update
+    elements.sharedNoteInput.addEventListener('keypress', async (e) => {
+      if (e.key === 'Enter') {
+        clearTimeout(typingTimer);
+        const content = elements.sharedNoteInput.value.trim();
+        await updateSharedNote(content);
+      }
+    });
+    
+    // Clear button
+    if (elements.clearSharedNote) {
+      elements.clearSharedNote.addEventListener('click', async () => {
+        await updateSharedNote("");
+      });
+    }
+  }
+  
+  async function updateSharedNote(content) {
+    if (!sharedNoteSystem.active || sharedNoteSystem.isUpdating) return;
+    
+    try {
+      sharedNoteSystem.isUpdating = true;
+      
+      const noteData = {
+        content: content,
+        lastUpdatedBy: appState.currentUser,
+        timestamp: Date.now()
+      };
+      
+      await sharedNoteSystem.roomRef.set(noteData);
+      
+      console.log("📝 Shared note updated:", content.substring(0, 50) + (content.length > 50 ? "..." : ""));
+      
+    } catch (error) {
+      console.error("Shared note update error:", error);
+      showMessage("Note update error!", true);
+    } finally {
+      setTimeout(() => {
+        sharedNoteSystem.isUpdating = false;
+      }, 500);
+    }
+  }
+  
+  function updateSharedNoteUI(data) {
+    if (!elements.sharedNoteInput || !elements.sharedNoteLastUpdated) return;
+    
+    const container = elements.sharedNoteInput.closest('.shared-note-container');
+    
+    if (data && data.content !== undefined) {
+      const content = data.content || "";
+      const lastUpdatedBy = data.lastUpdatedBy || "Unknown";
+      const timestamp = data.timestamp || Date.now();
+      
+      // Only update if content is different (avoid self-update loops)
+      if (elements.sharedNoteInput.value !== content) {
+        elements.sharedNoteInput.value = content;
+        
+        // Add update animation
+        elements.sharedNoteInput.classList.add('updated');
+        setTimeout(() => {
+          elements.sharedNoteInput.classList.remove('updated');
+        }, 600);
+      }
+      
+      // Update status
+      if (content) {
+        const timeAgo = getTimeAgo(timestamp);
+        elements.sharedNoteLastUpdated.textContent = `Updated by ${lastUpdatedBy} ${timeAgo}`;
+        
+        // Check if it's a link
+        const isLink = isValidUrl(content);
+        elements.sharedNoteInput.classList.toggle('has-link', isLink);
+        
+        // Add content styling
+        if (container) {
+          container.classList.add('has-content');
+        }
+      } else {
+        elements.sharedNoteLastUpdated.textContent = "No content";
+        elements.sharedNoteInput.classList.remove('has-link');
+        
+        if (container) {
+          container.classList.remove('has-content');
+        }
+      }
+      
+      sharedNoteSystem.lastContent = content;
+      
+    } else {
+      // No data
+      elements.sharedNoteInput.value = "";
+      elements.sharedNoteLastUpdated.textContent = "No content";
+      elements.sharedNoteInput.classList.remove('has-link');
+      
+      if (container) {
+        container.classList.remove('has-content');
+      }
+    }
+  }
+  
+  function isValidUrl(string) {
+    try {
+      const url = new URL(string);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (_) {
+      // Check for common URL patterns without protocol
+      const urlPattern = /^(www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}([\/\w\.-]*)*\/?$/;
+      return urlPattern.test(string);
+    }
+  }
+  
+  function getTimeAgo(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (seconds < 60) {
+      return "just now";
+    } else if (minutes < 60) {
+      return `${minutes}m ago`;
+    } else if (hours < 24) {
+      return `${hours}h ago`;
+    } else {
+      const days = Math.floor(hours / 24);
+      return `${days}d ago`;
+    }
+  }
+  
+  function stopSharedNoteSystem() {
+    if (sharedNoteSystem.active) {
+      sharedNoteSystem.active = false;
+      
+      if (sharedNoteSystem.listener && sharedNoteSystem.roomRef) {
+        sharedNoteSystem.roomRef.off('value', sharedNoteSystem.listener);
+        sharedNoteSystem.listener = null;
+      }
+      
+      if (sharedNoteSystem.updateTimer) {
+        clearTimeout(sharedNoteSystem.updateTimer);
+        sharedNoteSystem.updateTimer = null;
+      }
+      
+      // Reset UI
+      if (elements.sharedNoteInput) {
+        elements.sharedNoteInput.value = "";
+        elements.sharedNoteInput.classList.remove('has-link', 'updated');
+      }
+      
+      if (elements.sharedNoteLastUpdated) {
+        elements.sharedNoteLastUpdated.textContent = "No content";
+      }
+      
+      const container = elements.sharedNoteInput?.closest('.shared-note-container');
+      if (container) {
+        container.classList.remove('has-content');
+      }
+      
+      sharedNoteSystem.lastContent = "";
+      sharedNoteSystem.isUpdating = false;
+      
+      console.log("🛑 Shared Note system stopped");
+    }
+  }
+  
   // ================== MASTER-FOLLOWER SYSTEM ==================
   
   async function startMasterFollowerSystem(roomId) {
@@ -562,7 +793,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (videoSync.active) {
       console.log("🔄 Role changed, performing COMPLETE cleanup and restart...");
       
-      // EKLE: Önce role'ü set et
       // EKLE: Önce role'ü set et
       const newRole = masterSystem.iAmMaster ? 'master' : 'follower';
       videoSync.role = newRole; 
@@ -1122,6 +1352,7 @@ function initRoomManagement() {
           // Start systems
           await startMasterFollowerSystem(code);
           await startVideoSync(code);
+          await startSharedNoteSystem(code);
           
           showMessage("Joined video room!");
         } else {
@@ -1169,6 +1400,7 @@ function initRoomManagement() {
     elements.closeVideoChat.addEventListener("click", () => {
       stopVideoSync();
       stopMasterFollowerSystem();
+      stopSharedNoteSystem();
       stopWebRTC();
       
       appState.currentVideoRoom = "";
@@ -1702,6 +1934,7 @@ function cleanup() {
   
   stopVideoSync();
   stopMasterFollowerSystem();
+  stopSharedNoteSystem();
   stopChatSystem();
   stopWebRTC();
   
@@ -1877,7 +2110,7 @@ function emergencyRecovery() {
 function getSystemStatus() {
   return {
     timestamp: Date.now(),
-    version: "6.0.0-completely-fixed",
+    version: "6.0.0-completely-fixed-with-shared-notes",
     appState: {
       initialized: appState.initialized,
       currentUser: appState.currentUser,
@@ -1899,6 +2132,12 @@ function getSystemStatus() {
       timerActive: !!videoSync.activeTimer,
       syncCooldown: videoSync.syncCooldown,
       maxSyncDifference: videoSync.maxSyncDifference
+    },
+    sharedNoteSystem: {
+      active: sharedNoteSystem.active,
+      listenerActive: !!sharedNoteSystem.listener,
+      lastContent: sharedNoteSystem.lastContent,
+      isUpdating: sharedNoteSystem.isUpdating
     },
     chatSystem: {
       active: chatSystem.active,
@@ -1950,10 +2189,11 @@ function resetSyncState() {
 // ================== GLOBAL API ==================
 
 window.videoSyncApp = {
-  version: "6.0.0-completely-fixed",
+  version: "6.0.0-completely-fixed-with-shared-notes",
   appState,
   masterSystem,
   videoSync,
+  sharedNoteSystem,
   chatSystem,
   webrtcSystem,
   elements,
@@ -2006,7 +2246,7 @@ initApp();
 
 setTimeout(() => {
   const status = getSystemStatus();
-  console.log("🎉 FIXED VIDEO SYNC APP v6 FULLY LOADED!");
+  console.log("🎉 FIXED VIDEO SYNC APP v6 WITH SHARED NOTES FULLY LOADED!");
   console.log("📊 System Status:", status);
   console.log("📋 Available debug commands:");
   console.log("  - window.videoSyncApp.getStatus()");
@@ -2027,14 +2267,15 @@ setTimeout(() => {
   console.log("  ✅ Removed Enhanced system conflicts");
   console.log("  ✅ Improved state management");
   console.log("  ✅ Emergency recovery system");
+  console.log("  ✅ Shared Note system integrated");
   
 }, 2000);
 
 // Final ready message
 setTimeout(() => {
-  console.log("🎯 VIDEO SYNC APP TAMAMEN DÜZELTİLDİ!");
+  console.log("🎯 VIDEO SYNC APP WITH SHARED NOTES TAMAMEN DÜZELTİLDİ!");
   console.log(`⏰ Yükleme zamanı: ${new Date().toLocaleString('tr-TR')}`);
-  console.log(`🔢 App versiyon: v6.0.0-completely-fixed`);
+  console.log(`🔢 App versiyon: v6.0.0-completely-fixed-with-shared-notes`);
   console.log("🔧 Düzeltilen ana sorunlar:");
   console.log("  ✅ Çifte timer sistemi kaldırıldı");
   console.log("  ✅ Enhanced sistem çakışması çözüldü");
@@ -2042,7 +2283,8 @@ setTimeout(() => {
   console.log("  ✅ Sync cooldown 5 saniyeye çıkarıldı");
   console.log("  ✅ Emergency recovery sistemi eklendi");
   console.log("  ✅ Tüm state management'lar temizlendi");
-  console.log("🏁 Initialization complete - Ready for stable synchronized video experience!");
+  console.log("  ✅ Shared Note sistemi eklendi");
+  console.log("🏁 Initialization complete - Ready for stable synchronized video experience with shared notes!");
 }, 3000);
 
 });
