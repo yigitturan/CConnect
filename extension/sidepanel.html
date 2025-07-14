@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Cconnect - Video Sync & Chat</title>
   <link rel="stylesheet" href="styles.css">
   <script src="firebase/firebase-app-compat.js"></script>
@@ -315,6 +315,8 @@
                     class="input" 
                     placeholder="Enter 6-digit code" 
                     maxlength="6"
+                    pattern="[A-Z0-9]{6}"
+                    style="text-transform: uppercase;"
                   />
                   <button id="joinVideoRoomBtn" class="btn btn-primary">
                     <span>Join</span>
@@ -336,6 +338,8 @@
                     class="input" 
                     placeholder="Enter 6-digit code" 
                     maxlength="6"
+                    pattern="[A-Z0-9]{6}"
+                    style="text-transform: uppercase;"
                   />
                   <button id="joinChatRoomBtn" class="btn btn-success">
                     <span>Join</span>
@@ -398,11 +402,24 @@
           <!-- Video Streams -->
           <div class="video-container">
             <div class="video-stream-wrapper">
-              <video id="localVideo" autoplay muted playsinline class="video-stream"></video>
+              <video 
+                id="localVideo" 
+                autoplay 
+                muted 
+                playsinline 
+                class="video-stream"
+                poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23cbd5e1' font-family='sans-serif' font-size='14'%3ELocal Video%3C/text%3E%3C/svg%3E"
+              ></video>
               <div class="video-label">You</div>
             </div>
             <div class="video-stream-wrapper">
-              <video id="remoteVideo" autoplay playsinline class="video-stream"></video>
+              <video 
+                id="remoteVideo" 
+                autoplay 
+                playsinline 
+                class="video-stream"
+                poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='100%25' height='100%25' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23cbd5e1' font-family='sans-serif' font-size='14'%3ERemote Video%3C/text%3E%3C/svg%3E"
+              ></video>
               <div class="video-label">Friend</div>
             </div>
           </div>
@@ -580,6 +597,35 @@
             </button>
           </div>
           
+          <!-- Shared Note Area for Chat -->
+          <div class="shared-note-container">
+            <div class="shared-note-header">
+              <svg class="shared-note-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              </svg>
+              <span class="shared-note-label">Shared Note</span>
+              <button id="clearSharedNoteChatRoom" class="btn-ghost-mini" title="Clear note">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <div class="shared-note-input-wrapper">
+              <input 
+                type="text" 
+                id="sharedNoteInputChatRoom" 
+                class="shared-note-input" 
+                placeholder="Share a link or note with everyone..." 
+                maxlength="300"
+              />
+              <div class="shared-note-status">
+                <span id="sharedNoteLastUpdatedChatRoom" class="last-updated-text">No content</span>
+              </div>
+            </div>
+          </div>
+          
           <div class="chat-wrapper">
             <!-- Messages Area -->
             <div id="messages-container" class="messages-area">
@@ -610,6 +656,144 @@
               </div>
               <div class="character-count">
                 <small class="character-counter">0/500 characters</small>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Master Control Section for Chat Room -->
+          <div class="card" id="master-control-section-chat">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 3h12l4 6-10 13L2 9l4-6z"></path>
+                  <path d="M11 3L8 9l4 13 4-13-3-6"></path>
+                </svg>
+                Master Control
+              </h3>
+              <div class="badge badge-warning">Beta</div>
+            </div>
+            
+            <div class="master-status-grid">
+              <div class="status-item">
+                <div class="status-label">Your Status</div>
+                <div id="masterStatusChat" class="status-value">---</div>
+              </div>
+              <div class="status-item">
+                <div class="status-label">Current Master</div>
+                <div id="currentMasterChat" class="status-value">---</div>
+              </div>
+            </div>
+            
+            <button id="masterToggleBtnChat" class="btn btn-primary btn-full">
+              <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 3h12l4 6-10 13L2 9l4-6z"></path>
+              </svg>
+              <span>Switch Master</span>
+            </button>
+            
+            <div class="info-box">
+              <h4 class="info-title">How it works:</h4>
+              <ul class="info-list">
+                <li>Master controls affect all participants</li>
+                <li>Followers sync automatically to master</li>
+                <li>Click button to rotate master role</li>
+              </ul>
+            </div>
+          </div>
+          
+          <!-- Video Sync Section for Chat Room -->
+          <div class="card" id="video-sync-section-chat">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg class="card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23,4 23,10 17,10"></polyline>
+                  <polyline points="1,20 1,14 7,14"></polyline>
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                </svg>
+                Video Synchronization
+              </h3>
+            </div>
+            
+            <div class="sync-status-card">
+              <div class="sync-status-row">
+                <span class="sync-status-label">Status:</span>
+                <span id="syncStatusChat" class="badge badge-warning">Offline</span>
+              </div>
+            </div>
+            
+            <div class="time-display">
+              <div class="time-row">
+                <div class="time-item">
+                  <div class="time-header">
+                    <svg class="time-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                      <line x1="8" y1="21" x2="16" y2="21"></line>
+                      <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    <span class="time-label">Your Time</span>
+                  </div>
+                  <div id="currentVideoTimeChat" class="time-value">00:00</div>
+                </div>
+              </div>
+              
+              <div class="sync-arrow">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="7,13 12,18 17,13"></polyline>
+                  <polyline points="7,6 12,11 17,6"></polyline>
+                </svg>
+              </div>
+              
+              <div class="time-row">
+                <div class="time-item">
+                  <div class="time-header">
+                    <svg class="time-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span class="time-label">Master Time</span>
+                  </div>
+                  <div id="remoteVideoTimeChat" class="time-value">00:00</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="sync-info-note">
+              <div class="info-note-header">
+                <svg class="info-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M12 16v-4"></path>
+                  <path d="M12 8h.01"></path>
+                </svg>
+                <span class="info-note-title">Video Sync in Chat</span>
+              </div>
+              <p class="info-note-text">
+                Video synchronization works while browsing any video site. 
+                Open a video in another tab and the sync will automatically detect and synchronize playback with other room members.
+              </p>
+              <div class="info-note-features">
+                <div class="feature-item">
+                  <svg class="feature-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,11 12,14 22,4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                  <span>Auto-detection of video players</span>
+                </div>
+                <div class="feature-item">
+                  <svg class="feature-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,11 12,14 22,4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                  <span>Real-time synchronization</span>
+                </div>
+                <div class="feature-item">
+                  <svg class="feature-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,11 12,14 22,4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                  <span>Works with YouTube, Netflix, and more</span>
+                </div>
               </div>
             </div>
           </div>
