@@ -1650,7 +1650,7 @@ function stopChatSystem() {
 function initWebRTC() {
   if (!elements.startButton || !elements.hangupButton) return;
   
-  // Start button
+  // Start button - GÜNCELLENMİŞ VERSİYON
   elements.startButton.onclick = async () => {
     try {
       updateVideoStatus("Starting camera...");
@@ -1677,7 +1677,32 @@ function initWebRTC() {
       
     } catch (error) {
       console.error("Camera startup error:", error);
-      updateVideoStatus("Camera/microphone access error: " + error.message);
+      
+      // *** YENİ: MİKROFON/KAMERA ERİŞİM REDDİ KONTROLÜ ***
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        console.log("🚫 Media permission denied, redirecting to extension settings...");
+        updateVideoStatus("Media access denied - Opening extension settings...");
+        
+        // Extension ID'yi otomatik al ve ayarlar sayfasını aç
+        const extensionId = chrome.runtime.id;
+        const settingsUrl = `chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2F${extensionId}`;
+        
+        // Ayarlar sayfasını aç
+        chrome.tabs.create({ url: settingsUrl });
+        
+        // Kullanıcıya bilgi ver
+        setTimeout(() => {
+          updateVideoStatus("Extension settings opened. Please allow camera and microphone access, then try again.");
+        }, 1000);
+        
+      } else if (error.name === 'NotFoundError') {
+        updateVideoStatus("Camera/microphone not found");
+      } else if (error.name === 'NotReadableError') {
+        updateVideoStatus("Camera/microphone already in use");
+      } else {
+        updateVideoStatus("Camera/microphone access error: " + error.message);
+      }
+      
       elements.startButton.disabled = false;
     }
   };
@@ -1717,7 +1742,7 @@ function initWebRTC() {
     };
   }
   
-  console.log("📹 WebRTC initialized");
+  console.log("📹 WebRTC initialized with settings redirect");
 }
 
 async function setupWebRTCSignaling(roomId) {
