@@ -1646,7 +1646,7 @@ html {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-lg);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-xl); /* İKİNCİ ÖNEMLİ DEĞİŞİKLİK: Chat ve Master Control arası mesafe */
   overflow-y: auto;
   max-height: 350px;
   min-height: 250px;
@@ -1695,6 +1695,8 @@ html {
   opacity: 0.8;
 }
 
+/* ================== CHAT MESSAGE LAYOUT - DÜZELTİLMİŞ ================== */
+
 .message {
   display: flex;
   flex-direction: column;
@@ -1705,13 +1707,11 @@ html {
   line-height: 1.4;
   word-wrap: break-word;
   word-break: break-word;
-  background: var(--bg-hover);
   border: 1px solid var(--border-primary);
   position: relative;
   margin-bottom: var(--space-sm);
   transition: all var(--transition-normal);
-  width: 100%;
-  max-width: 100%;
+  max-width: 85%; /* Mesajların maksimum genişliğini sınırla */
 }
 
 .message:hover {
@@ -1763,21 +1763,44 @@ html {
   line-height: 1.4;
 }
 
+/* Kendi mesajlarınız - SAĞ TARAF */
 .own-message {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, var(--bg-hover) 100%);
   border-color: rgba(99, 102, 241, 0.3);
-  margin-left: var(--space-md);
+  margin-left: var(--space-xl);  /* Sol taraftan margin artırıldı */
+  margin-right: var(--space-sm); /* Sağ taraftan az margin */
+  align-self: flex-end;          /* Sağa hizala */
+  text-align: right;             /* Metni sağa hizala */
 }
 
 .own-message .message-sender {
   background: var(--gradient-primary);
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  margin-left: auto;             /* Gönderen adını sağa hizala */
 }
 
+.own-message .message-header {
+  justify-content: flex-end;     /* Header elemanlarını sağa hizala */
+  flex-direction: row-reverse;   /* Sırayı ters çevir (zaman - isim) */
+}
+
+/* Diğer kişilerin mesajları - SOL TARAF */
 .other-message {
   background: var(--bg-hover);
   border-color: var(--border-primary);
-  margin-right: var(--space-md);
+  margin-right: var(--space-xl); /* Sağ taraftan margin artırıldı */
+  margin-left: var(--space-sm);  /* Sol taraftan az margin */
+  align-self: flex-start;        /* Sola hizala */
+  text-align: left;              /* Metni sola hizala */
+}
+
+.other-message .message-sender {
+  margin-right: auto;            /* Gönderen adını sola hizala */
+}
+
+.other-message .message-header {
+  justify-content: flex-start;   /* Header elemanlarını sola hizala */
+  flex-direction: row;           /* Normal sıra (isim - zaman) */
 }
 
 .message-input-container {
@@ -1786,6 +1809,7 @@ html {
   border-top: 1px solid var(--border-primary);
   flex-shrink: 0;
   width: 100%;
+  margin-bottom: var(--space-xl); /* ÜÇÜNCÜ ÖNEMLİ DEĞİŞİKLİK: Input container ile Master Control arası mesafe */
 }
 
 .message-input-wrapper {
@@ -1874,7 +1898,7 @@ html {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-xl); /* DÖRDÜNCÜ ÖNEMLİ DEĞİŞİKLİK: Daha fazla margin-top */
   width: 100%;
 }
 
@@ -2045,6 +2069,21 @@ html {
   .content {
     padding: var(--space-md);
   }
+
+  /* Mobil cihazlarda margin ayarları */
+  .own-message {
+    margin-left: var(--space-lg);
+    margin-right: 4px;
+  }
+
+  .other-message {
+    margin-right: var(--space-lg);
+    margin-left: 4px;
+  }
+
+  .message {
+    max-width: 90%; /* Mobilde biraz daha geniş */
+  }
 }
 
 /* Small Mobile (max-width: 360px) */
@@ -2160,6 +2199,7 @@ html {
     padding: var(--space-xs) var(--space-sm);
     font-size: 11px;
     margin-bottom: 4px;
+    max-width: 95%; /* Çok küçük ekranlarda daha geniş */
   }
 
   .message-sender {
@@ -2266,6 +2306,17 @@ html {
   .sync-arrow svg {
     width: 16px;
     height: 16px;
+  }
+
+  /* Küçük mobil cihazlarda mesaj ayarları */
+  .own-message {
+    margin-left: var(--space-md);
+    margin-right: 2px;
+  }
+
+  .other-message {
+    margin-right: var(--space-md);
+    margin-left: 2px;
   }
 }
 

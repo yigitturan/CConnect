@@ -1564,14 +1564,62 @@ function displayMessage(message) {
   if (!elements.messagesContainer) return;
   
   const messageEl = document.createElement("div");
-  messageEl.textContent = `${message.sender}: ${message.text}`;
-  messageEl.className = message.sender === appState.currentUser ? "sent-message" : "received-message";
   
-  const colors = ["#8b5cf6", "#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
-  const colorIndex = message.sender.charCodeAt(0) % colors.length;
-  messageEl.style.backgroundColor = colors[colorIndex];
+  // Mesaj içeriği
+  const isOwn = message.sender === appState.currentUser;
+  
+  // HTML yapısı
+  messageEl.innerHTML = `
+    <div class="message-header">
+      <span class="message-sender">${message.sender}</span>
+      <span class="message-time">${formatMessageTime(message.timestamp)}</span>
+    </div>
+    <div class="message-text">${escapeHtml(message.text)}</div>
+  `;
+  
+  // CSS sınıfları
+  messageEl.className = isOwn ? "message own-message" : "message other-message";
+  
+  // Renk sistemi (diğer kişiler için)
+  if (!isOwn) {
+    const colors = ["#8b5cf6", "#ef4444", "#f59e0b", "#10b981", "#3b82f6"];
+    const colorIndex = message.sender.charCodeAt(0) % colors.length;
+    const senderEl = messageEl.querySelector('.message-sender');
+    if (senderEl) {
+      senderEl.style.backgroundColor = colors[colorIndex];
+    }
+  }
   
   elements.messagesContainer.appendChild(messageEl);
+}
+
+// Yardımcı fonksiyonlar
+function formatMessageTime(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now - date;
+  
+  // Bugünse sadece saat:dakika
+  if (diff < 24 * 60 * 60 * 1000) {
+    return date.toLocaleTimeString('tr-TR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  }
+  
+  // Eski mesajlar için tarih de
+  return date.toLocaleString('tr-TR', { 
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function scrollToBottom() {
